@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ANSI Z359.13 Multi-Test Tracker (5 Slots)</title>
+  <script src="https://jsdelivr.net"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f5f5f7; color: #1d1d1f; margin: 0; }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 20px; }
+    h2, h3 { margin-top: 0; color: #000; }
+    .config-bar { display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 200px; }
+    label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.9em; }
+    select { padding: 10px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 14px; width: 100%; background: #fff; }
+    .slots-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+    .slot { border: 2px dashed #b2d6ff; padding: 15px; border-radius: 8px; background: #fbfdff; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+    .slot:hover { background: #f0f7ff; }
+    .slot.loaded { border-style: solid; background: #eef7ff; cursor: default; }
+    .slot-title { font-weight: bold; font-size: 0.9em; margin-bottom: 4px; pointer-events: none; }
+    .slot-meta { font-size: 0.75em; color: #555; word-break: break-all; pointer-events: none; }
+    .slot input[type="file"] { display: none; }
+    .clear-btn { position: absolute; top: 6px; right: 6px; background: #ff3b30; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    .report-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 20px; }
+    .report-card { padding: 12px; border-radius: 8px; background: #f5f5f7; border-top: 4px solid #86868b; font-size: 0.85em; }
+    .report-card.PASS { border-top-color: #34c759; background: #eafaf1; }
+    .report-card.FAIL { border-top-color: #ff3b30; background: #fdf2f2; }
+    .report-card h4 { margin: 0 0 8px 0; font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chart-wrapper { position: relative; height: 450px; width: 100%; margin-top: 15px; }
+    .badge { font-weight: bold; display: block; margin-top: 2px; font-size: 1.1em; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>ANSI Z359.13 Shock Pack Multi-Dataset Suite</h2>
+    <div class="config-bar">
+      <div class="form-group">
+        <label>Evaluation Test Mode</label>
+        <select id="testMode" onchange="rebuildChartAndReports()">
+          <option value="dynamic">Dynamic Performance (1,800 Peak / 900 Avg)</option>
+          <option value="static">Static Hold Test (5,000 lbs for 1 min)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>LineScale Data Rate</label>
+        <select id="samplingRate" onchange="rebuildChartAndReports()">
+          <option value="1280">1,280 Hz (High Speed USB Drive)</option>
+          <option value="40">40 Hz (Economy Mode)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <h3>Load Datasets (Up to 5 LineScale CSV Files)</h3>
+  <div class="slots-grid">
+    <div class="slot" id="slot0" onclick="triggerUpload(0)"><div class="slot-title">Dataset 1</div><div class="slot-meta" id="meta0">Click to upload</div><input type="file" id="file0" accept=".csv,.txt" onchange="handleFileSelect(0)"></div>
+    <div class="slot" id="slot1" onclick="triggerUpload(1)"><div class="slot-title">Dataset 2</div><div class="slot-meta" id="meta1">Click to upload</div><input type="file" id="file1" accept=".csv,.txt" onchange="handleFileSelect(1)"></div>
+    <div class="slot" id="slot2" onclick="triggerUpload(2)"><div class="slot-title">Dataset 3</div><div class="slot-meta" id="meta2">Click to upload</div><input type="file" id="file2" accept=".csv,.txt" onchange="handleFileSelect(2)"></div>
+    <div class="slot" id="slot3" onclick="triggerUpload(3)"><div class="slot-title">Dataset 4</div><div class="slot-meta" id="meta3">Click to upload</div><input type="file" id="file3" accept=".csv,.txt" onchange="handleFileSelect(3)"></div>
+    <div class="slot" id="slot4" onclick="triggerUpload(4)"><div class="slot-title">Dataset 5</div><div class="slot-meta" id="meta4">Click to upload</div><input type="file" id="file4" accept=".csv,.txt" onchange="handleFileSelect(4)"></div>
+  </div>
+  <div class="card"><h3>Auto-Zoom Comparison Graph</h3><div class="chart-wrapper"><canvas id="comparisonChart"></canvas></div></div>
+  <div class="card"><h3>Side-by-Side Comparison Metrics</h3><div class="report-grid" id="reportGrid"></div></div>
+</div>
+<script>
+  let datasetsStore = [null, null, null, null, null];
+  let chartInstance = null;
+  const slotColors = ['#0066cc', '#ff9500', '#34c759', '#5856d6', '#ff2d55'];
+
+  function triggerUpload(index) {
+    if (datasetsStore[index] !== null) return;
+    document.getElementById('file' + index).click();
+  }
+
+  function clearSlot(event, index) {
+    event.stopPropagation(); event.preventDefault();
+    datasetsStore[index] = null;
+    const slotEl = document.getElementById('slot' + index);
+    slotEl.classList.remove('loaded');
+    slotEl.innerHTML = `<div class="slot-title">Dataset ${index + 1}</div><div class="slot-meta" id="meta${index}">Click to upload</div><input type="file" id="file${index}" accept=".csv,.txt" onchange="handleFileSelect(${index})">`;
+    rebuildChartAndReports();
+  }
+
+  function handleFileSelect(index) {
+    const input = document.getElementById('file' + index);
+    if (!input.files || !input.files.length) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) { parseAndStore(e.target.result, file.name, index); };
+    reader.readAsText(file);
+  }
+
+  function parseAndStore(text, filename, index) {
+    const lines = text.split(/\r?\n/);
+    let rawPoints = [];
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) continue;
+      const columns = trimmed.split(',');
+      const val = parseFloat(columns[0].trim());
+      if (!isNaN(val)) rawPoints.push(val);
+    }
+    if(rawPoints.length === 0) { alert("No numerical data found in slot " + (index+1)); return; }
+    datasetsStore[index] = { filename: filename, rawPoints: rawPoints };
+    const slotEl = document.getElementById('slot' + index);
+    slotEl.classList.add('loaded');
+    slotEl.innerHTML = `<button class="clear-btn" onclick="clearSlot(event, ${index})">✕</button><div class="slot-title">Dataset ${index + 1}</div><div class="slot-meta">${filename}</div><input type="file" id="file${index}" accept=".csv,.txt" style="display:none;">`;
+    rebuildChartAndReports();
+  }
+
+  function rebuildChartAndReports() {
+    const mode = document.getElementById('testMode').value;
+    const hz = parseFloat(document.getElementById('samplingRate').value);
+    const secondsPerRow = 1 / hz;
+    let chartDatasets = [];
+    const reportGrid = document.getElementById('reportGrid');
+    reportGrid.innerHTML = '';
+    let universalMaxForce = 0, globalMinTime = 999999, globalMaxTime = 0;
+
+    for (let i = 0; i < 5; i++) {
+      const dataObj = datasetsStore[i];
+      if (!dataObj) { reportGrid.innerHTML += `<div class="report-card"><h4>Dataset ${i+1}: Empty</h4><p>No log loaded.</p></div>`; continue; }
+      const rawPoints = dataObj.rawPoints;
+      let maxForce = 0, sumAboveThreshold = 0, pointsAboveThreshold = 0, xyPoints = [];
+      const downsampleStride = Math.max(1, Math.floor(rawPoints.length / 800));
+      let firstActiveIndex = -1, lastActiveIndex = -1;
+
+      for (let j = 0; j < rawPoints.length; j++) {
+        const val = rawPoints[j];
+        if (val > maxForce) maxForce = val;
+        if (mode === 'dynamic') {
+          if (val >= 500) { sumAboveThreshold += val; pointsAboveThreshold++; if (firstActiveIndex === -1) firstActiveIndex = j; lastActiveIndex = j; }
+        } else if (mode === 'static') {
+          if (val >= 5000) { pointsAboveThreshold++; if (firstActiveIndex === -1) firstActiveIndex = j; lastActiveIndex = j; }
+        }
+        if (j % downsampleStride === 0) xyPoints.push({ x: j * secondsPerRow, y: val });
+      }
+      if (maxForce > universalMaxForce) universalMaxForce = maxForce;
+      const avgForce = pointsAboveThreshold > 0 ? (sumAboveThreshold / pointsAboveThreshold) : 0;
+      const duration = pointsAboveThreshold * secondsPerRow;
+
+      if (firstActiveIndex !== -1) {
+        let localMin = firstActiveIndex * secondsPerRow, localMax = lastActiveIndex * secondsPerRow;
+        if (localMin < globalMinTime) globalMinTime = localMin;
+        if (localMax > globalMaxTime) globalMaxTime = localMax;
+      } else {
+        if (0 < globalMinTime) globalMinTime = 0;
+        let totalTime = rawPoints.length * secondsPerRow;
+        if (totalTime > globalMaxTime) globalMaxTime = totalTime;
+      }
+
+      let passClass = 'PASS', verdictText = 'PASSED';
+      if (mode === 'dynamic') {
+        if (maxForce > 1800 || (pointsAboveThreshold > 0 && avgForce > 900)) { passClass = 'FAIL'; verdictText = 'FAILED'; }
+      } else { if (duration < 60.0) { passClass = 'FAIL'; verdictText = 'FAILED'; } }
+
+      reportGrid.innerHTML += `<div class="report-card ${passClass}"><h4>T${i+1}: ${dataObj.filename}</h4><b>Status: ${verdictText}</b><br><br>Peak: <span class="badge">${maxForce.toFixed(1)} lbs</span>${mode === 'dynamic' ? `Avg >500: <span class="badge">\${avgForce.toFixed(1)} lbs</span>` : ''}Duration: <span class="badge">${duration.toFixed(2)} sec</span></div>`;
+      chartDatasets.push({ label: `Dataset ${i+1}`, data: xyPoints, borderColor: slotColors[i], borderWidth: 2, pointRadius: 0, tension: 0.05, fill: false });
+    }
+
+    let xMinBuffer = Math.max(0, globalMinTime - 0.75), xMaxBuffer = globalMaxTime + 0.75;
+    if (globalMinTime === 999999) { xMinBuffer = 0; xMaxBuffer = 5; }
+    if (chartInstance) chartInstance.destroy();
+    const ctx = document.getElementById('comparisonChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+      type: 'line', data: { datasets: chartDatasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        scales: {
+          x: { type: 'linear', title: { display: true, text: 'Time (Seconds)' }, min: xMinBuffer, max: xMaxBuffer },
+          y: { title: { display: true, text: 'Force (lbs)' }, min: 0, max: universalMaxForce > 0 ? Math.ceil((universalMaxForce * 1.15) / 100) * 100 : 6000 }
+        }
+      }
+    });
+  }
+  rebuildChartAndReports();
+</script>
+</body>
+</html>
