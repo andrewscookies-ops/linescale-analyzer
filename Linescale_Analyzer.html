@@ -25,7 +25,7 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <div class="toolbar" id="folders"></div><div class="layout"><section class="card"><h2>Recordings</h2><div class="toolbar"><input id="search" type="search" placeholder="Filter by filename" aria-label="Filter by filename" oninput="render()"><select id="sort" aria-label="Sort logs" onchange="render()"><option value="added">Import order</option><option value="name">Filename</option><option value="peak">Lowest peak first</option><option value="duration">Shortest first</option></select></div>
 <div class="toolbar"><button onclick="selectVisible(true)">Select filtered</button><button onclick="selectVisible(false)">Deselect filtered</button><button class="danger" id="removeSelected" onclick="removeSelected()">Remove selected</button><button id="undo" onclick="undoRemove()">Undo removal</button></div><div class="muted"><strong>Preview:</strong> click a filename. <strong>Select:</strong> check its box.<br>“Select filtered” selects the visible rows. Removing or comparing uses all checked logs in this folder, including any hidden by a search. Your original files are never deleted.</div>
 <div class="table-wrap"><table><thead><tr><th>Select</th><th>File / activity</th><th>Peak (lb)</th><th>Length (s)</th><th></th></tr></thead><tbody id="rows"></tbody></table></div><p id="empty" class="muted"></p></section>
-<section class="card"><p class="eyebrow">Graph preview</p><h2 id="previewName">Choose a log to preview</h2><div class="toolbar"><button id="previous" onclick="navigate(-1)">← Previous</button><button id="next" onclick="navigate(1)">Next →</button><button id="removeCurrent" class="danger" onclick="removeLogs([currentId])">Remove this log</button><label><input id="compare" type="checkbox" onchange="draw()">Compare selected logs</label></div><div id="metrics" class="metrics"></div><div id="chartError" role="status"></div><div class="chart"><canvas id="chart"></canvas></div><div class="muted"><strong>Reading the graph:</strong> time runs left to right; force runs bottom to top. Recordings are aligned at their start.<details class="metric-help"><summary>What do the numbers mean?</summary><ul><li><strong>Peak:</strong> highest force in the file.</li><li><strong>Recording:</strong> total recorded length, including pre-capture.</li><li><strong>Dynamic average:</strong> average of samples at or above 500 lb.</li><li><strong>Static hold:</strong> longest uninterrupted run at or above 5,000 lb.</li><li><strong>No activity:</strong> no samples reached that folder’s threshold. Review before removing.</li></ul>These are review metrics, not certification verdicts.</details></div></section></div><footer class="footer"><span>Created by Andrew Harris with AI assistance for use by The Adventure Guild.</span><span>Keep this tab open: reloading clears this session. Original CSVs stay on your computer.</span></footer></main><dialog id="reportDialog" class="share-dialog" style="width:min(1000px,calc(100% - 32px))" aria-labelledby="reportTitle">
+<section class="card"><p class="eyebrow">Graph preview</p><h2 id="previewName">Choose a log to preview</h2><div class="toolbar"><button id="previous" onclick="navigate(-1)">← Previous</button><button id="next" onclick="navigate(1)">Next →</button><button id="removeCurrent" class="danger" onclick="removeLogs([currentId])">Remove this log</button><label><input id="compare" type="checkbox" onchange="draw()">Compare selected logs</label></div><div id="metrics" class="metrics"></div><div id="chartError" role="status"></div><div id="mainGraphInteraction"><div id="mainGraphTools"></div><p class="muted">Scroll / pinch to zoom · drag to pan · double-click to fit. The report keeps this view for the same recording set.</p><div class="chart"><canvas id="chart"></canvas></div></div><div class="muted"><strong>Reading the graph:</strong> time runs left to right; force runs bottom to top. Recordings are aligned at their start.<details class="metric-help"><summary>What do the numbers mean?</summary><ul><li><strong>Peak:</strong> highest force in the file.</li><li><strong>Recording:</strong> total recorded length, including pre-capture.</li><li><strong>Dynamic average:</strong> average of samples at or above 500 lb.</li><li><strong>Static hold:</strong> longest uninterrupted run at or above 5,000 lb.</li><li><strong>No activity:</strong> no samples reached that folder’s threshold. Review before removing.</li></ul>These are review metrics, not certification verdicts.</details></div></section></div><footer class="footer"><span>Created by Andrew Harris with AI assistance for use by The Adventure Guild.</span><span>Keep this tab open: reloading clears this session. Original CSVs stay on your computer.</span></footer></main><dialog id="reportDialog" class="share-dialog" style="width:min(1000px,calc(100% - 32px))" aria-labelledby="reportTitle">
 <div class="share-heading"><h2 id="reportTitle">Export drop / static report</h2><button onclick="$('reportDialog').close()" aria-label="Close report builder">✕</button></div>
 <p class="muted">Select the recordings that belong to your sample set. Export a report with numbers and graphs for your Z359.13 review.</p>
 <div class="report-fields">
@@ -57,9 +57,9 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <p id="reportCount" role="status"></p><p id="reportError" role="alert" style="color:#ffb5b5"></p>
 <div class="toolbar"><button class="primary" onclick="exportReport('print')">Print / Save PDF</button><button onclick="exportReport('html')">Download report</button><button onclick="exportReport('csv')">Results CSV</button><button onclick="exportReport('json')">Evidence data</button></div>
 <p class="muted">The PDF uses your browser’s print dialog. The downloaded HTML report includes its graphs and opens offline. Evidence data includes all selected force samples. Overall Z359.13 compliance remains pending review of the complete test requirements.</p>
-<div id="reportPreview" style="background:#fff;color:#172130;border-radius:10px;padding:16px;overflow:auto"></div>
+<p class="muted">Graph controls: scroll / pinch to zoom, drag to pan, or use the buttons. Double-click or Reset / Fit restores automatic sizing. Exports capture these preview ranges.</p><div id="reportPreview" style="background:#fff;color:#172130;border-radius:10px;padding:16px;overflow:auto"></div>
 </dialog>
-<style>.report-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 16px}.report-fields label{display:flex;flex-direction:column;align-items:stretch;margin:8px 0}.report-fields input[type=checkbox]{width:18px}.report-fields select{width:100%}#reportDialog>label{display:block}#reportDialog textarea{display:block;width:100%;font:inherit;background:#101923;color:var(--text);border:1px solid #344458;border-radius:9px;padding:10px}#reportDialog details{margin:16px 0}#reportDialog summary{cursor:pointer;font-weight:650}#reportPreview svg{display:block;width:100%;min-width:400px}#reportPreview figure{margin:12px 0}#reportPreview figcaption{font-size:12px;overflow-wrap:anywhere}#reportPreview table{color:#172130}#reportPreview th{position:static;background:#eaf0f4;color:#172130}</style>
+<style>.report-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 16px}.report-fields label{display:flex;flex-direction:column;align-items:stretch;margin:8px 0}.report-fields input[type=checkbox]{width:18px}.report-fields select{width:100%}#reportDialog>label{display:block}#reportDialog textarea{display:block;width:100%;font:inherit;background:#101923;color:var(--text);border:1px solid #344458;border-radius:9px;padding:10px}#reportDialog details{margin:16px 0}#reportDialog summary{cursor:pointer;font-weight:650}#reportPreview svg{display:block;width:100%;min-width:400px}#reportPreview figure{margin:12px 0}#reportPreview figcaption{font-size:12px;overflow-wrap:anywhere}#reportPreview table{color:#172130}#reportPreview th{position:static;background:#eaf0f4;color:#172130}.graph-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:12px 0}.graph-tools label{display:flex!important;flex-direction:row!important;gap:6px;margin:0!important}.graph-tools button,.graph-tools select{font-size:12px;padding:6px 10px}#mainGraphInteraction canvas{touch-action:none;cursor:grab}</style>
 <dialog id="shareDialog" class="share-dialog" aria-labelledby="shareTitle" onclick="if(event.target===this)this.close()">
 <div class="share-heading"><h2 id="shareTitle">Share LineScale Analyzer</h2><button type="button" onclick="document.getElementById('shareDialog').close()" aria-label="Close share dialog" autofocus>✕</button></div>
 <p class="muted">Send the app link or let someone scan the QR code.</p>
@@ -183,7 +183,59 @@ function draw(){
  $('chartError').textContent=comparison&&!chosen.length?'Select logs in the list to compare.':'';
  if(chart)chart.destroy();
  chart=new Chart($('chart').getContext('2d'),{type:'line',data:{datasets:chosen.map(l=>({label:l.name,data:chartPoints(l.points,RATE[l.mode]),borderColor:`hsl(${(l.id*137.508)%360},75%,68%)`,borderWidth:1.5,pointRadius:0,tension:0,fill:false}))},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,plugins:{legend:{display:comparison,labels:{color:'#c1cede',boxWidth:12}},tooltip:{backgroundColor:'#172433',titleColor:'#edf3fa',bodyColor:'#c1cede',borderColor:'#36516a',borderWidth:1}},scales:{x:{type:'linear',grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Time from recording start (seconds)',color:'#9dadc1'}},y:{grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Force (lb)',color:'#9dadc1'}}}}});
+ updateMainView(chosen);
 }
+// Views are keyed by the exact recording set, shared by the chart and report.
+const graphViews={},graphFrames={},graphAxes={};
+function graphKey(items){return 'g-'+items.map(l=>l.mode+'-'+l.id).sort().join('-');}
+function graphZoom(v,factor,ax=.5,ay=.5,axis='both'){
+ const out={...v};factor=Math.max(.1,Math.min(10,factor));
+ for(const [a,b,t,on] of [['xmin','xmax',ax,axis!=='force'],['ymin','ymax',ay,axis!=='time']]){
+  if(!on)continue;const span=v[b]-v[a],size=Math.max(1e-7,Math.min(1e12,span*factor)),center=v[a]+span*t;out[a]=center-size*t;out[b]=out[a]+size;
+ }return out;
+}
+function graphPan(v,dx,dy,axis='both'){
+ const x=axis==='force'?0:dx*(v.xmax-v.xmin),y=axis==='time'?0:dy*(v.ymax-v.ymin);
+ return {xmin:v.xmin-x,xmax:v.xmax-x,ymin:v.ymin+y,ymax:v.ymax+y};
+}
+function graphToolbar(key){return `<div class="graph-tools" data-graph-tools="${key}"><button type="button" data-view-action="in" aria-label="Zoom in">＋</button><button type="button" data-view-action="out" aria-label="Zoom out">−</button><label>Axes <select aria-label="Zoom and pan axes" data-view-axis><option value="both" ${!graphAxes[key]||graphAxes[key]==='both'?'selected':''}>Both</option><option value="time" ${graphAxes[key]==='time'?'selected':''}>Time</option><option value="force" ${graphAxes[key]==='force'?'selected':''}>Force</option></select></label><button type="button" data-view-action="left" aria-label="Pan left">←</button><button type="button" data-view-action="right" aria-label="Pan right">→</button><button type="button" data-view-action="up" aria-label="Pan up">↑</button><button type="button" data-view-action="down" aria-label="Pan down">↓</button><button type="button" data-view-action="reset">Reset / Fit</button></div>`;}
+function graphAction(key,action,redraw){
+ const v=graphViews[key]||graphFrames[key]?.view;if(!v)return;
+ if(action==='reset')delete graphViews[key];
+ else if(action==='in'||action==='out')graphViews[key]=graphZoom(v,action==='in'?.8:1.25,.5,.5,graphAxes[key]);
+ else graphViews[key]=graphPan(v,action==='left'?.15:action==='right'?-.15:0,action==='up'?.15:action==='down'?-.15:0,graphAxes[key]);
+ redraw();
+}
+function bindGraphGestures(root,findGraph,redraw){
+ if(root.dataset.viewBound)return;root.dataset.viewBound='true';
+ const pointers=new Map();let gesture=null;
+ const fraction=(e,rect)=>({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height});
+ function rebase(){if(!gesture)return;gesture.base={...(graphViews[gesture.key]||graphFrames[gesture.key].view)};gesture.start=[...pointers.values()];}
+ root.addEventListener('click',e=>{const b=e.target.closest('[data-view-action]');if(b)graphAction(b.closest('[data-graph-tools]').dataset.graphTools,b.dataset.viewAction,redraw);});
+ root.addEventListener('change',e=>{if(e.target.matches('[data-view-axis]'))graphAxes[e.target.closest('[data-graph-tools]').dataset.graphTools]=e.target.value;});
+ root.addEventListener('wheel',e=>{const g=findGraph(e);if(!g)return;const p=fraction(e,g.rect);if(p.x<0||p.x>1||p.y<0||p.y>1)return;e.preventDefault();const v=graphViews[g.key]||graphFrames[g.key].view;graphViews[g.key]=graphZoom(v,Math.exp(Math.max(-.5,Math.min(.5,e.deltaY*(e.deltaMode===1?.04:.002)))),p.x,1-p.y,graphAxes[g.key]);redraw();},{passive:false});
+ root.addEventListener('pointerdown',e=>{if(e.button!==0)return;const g=findGraph(e);if(!g||gesture&&gesture.key!==g.key)return;const p=fraction(e,g.rect);if(p.x<0||p.x>1||p.y<0||p.y>1)return;e.preventDefault();root.setPointerCapture(e.pointerId);pointers.set(e.pointerId,p);gesture=gesture||g;rebase();});
+ root.addEventListener('pointermove',e=>{if(!gesture||!pointers.has(e.pointerId))return;pointers.set(e.pointerId,fraction(e,gesture.rect));const cur=[...pointers.values()],start=gesture.start;let v;
+  if(cur.length>1&&start.length>1){const dist=a=>Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y),mid=a=>({x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2}),a=mid(start),b=mid(cur);v=graphZoom(gesture.base,Math.max(.001,dist(start))/Math.max(.001,dist(cur)),a.x,1-a.y,graphAxes[gesture.key]);v=graphPan(v,b.x-a.x,b.y-a.y,graphAxes[gesture.key]);}
+  else v=graphPan(gesture.base,cur[0].x-start[0].x,cur[0].y-start[0].y,graphAxes[gesture.key]);
+  graphViews[gesture.key]=v;redraw();
+ });
+ const end=e=>{pointers.delete(e.pointerId);if(!pointers.size)gesture=null;else rebase();};
+ root.addEventListener('pointerup',end);root.addEventListener('pointercancel',end);root.addEventListener('lostpointercapture',end);
+ root.addEventListener('dblclick',e=>{const g=findGraph(e);if(g){delete graphViews[g.key];redraw();}});
+}
+function bindReportViews(){
+ bindGraphGestures($('reportPreview'),e=>{const svg=e.target.closest('svg[data-view-key]');if(!svg)return;const r=svg.getBoundingClientRect(),h=Number(svg.dataset.plotHeight);return {key:svg.dataset.viewKey,rect:{left:r.left+r.width*78/960,top:r.top+r.height*28/h,width:r.width*858/960,height:r.height*(h-83)/h}};},refreshReport);
+}
+function updateMainView(items){
+ const tools=$('mainGraphTools');if(!tools)return;if(!items.length){tools.innerHTML='';tools.dataset.currentKey='';return;}if(!chart?.scales?.x)return;
+ const key=graphKey(items),v=graphViews[key];
+ if(v){Object.assign(chart.options.scales.x,{min:v.xmin,max:v.xmax});Object.assign(chart.options.scales.y,{min:v.ymin,max:v.ymax});chart.update('none');}
+ graphFrames[key]={view:{xmin:chart.scales.x.min,xmax:chart.scales.x.max,ymin:chart.scales.y.min,ymax:chart.scales.y.max}};
+ tools.innerHTML=graphToolbar(key);tools.dataset.currentKey=key;
+ bindGraphGestures($('mainGraphInteraction'),e=>{if(e.target!==$('chart')||!chart?.chartArea||!$('mainGraphTools').dataset.currentKey)return;const r=$('chart').getBoundingClientRect(),a=chart.chartArea;return {key:$('mainGraphTools').dataset.currentKey,rect:{left:r.left+a.left*r.width/chart.width,top:r.top+a.top*r.height/chart.height,width:(a.right-a.left)*r.width/chart.width,height:(a.bottom-a.top)*r.height/chart.height}};},draw);
+}
+
 function reportSelection(){return logs.filter(l=>l.selected&&($('reportScope').value==='all'||l.mode===$('mode').value));}
 function reportOptions(){
  const number=id=>{const s=$(id).value.trim();if(!s)return null;const n=Number(s);if(!Number.isFinite(n)||n<0)throw Error('Force limits and hold time must be finite, non-negative numbers.');return n;};
@@ -209,22 +261,28 @@ function reportGraph(items,o){
  const limit=items[0].mode==='dynamic'?o.peak:o.force;
  if(o.limits&&limit!==null)top=Math.max(top,limit);
  const range=top-bottom||1;top+=range*.08;if(bottom<0)bottom-=range*.04;end=end||1/RATE[items[0].mode];
- const x=v=>L+v/end*pw,y=v=>T+(top-v)/(top-bottom)*ph;
- let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Force versus time graph"><rect width="${W}" height="${H}" fill="white"/>`;
+ const key=graphKey(items),auto={xmin:0,xmax:end,ymin:bottom,ymax:top};
+ const view=o.views?.[key]||graphViews[key]||auto;
+ if(o.interactive)graphFrames[key]={view:{...view}};
+ const x=v=>L+(v-view.xmin)/(view.xmax-view.xmin)*pw,y=v=>T+(view.ymax-v)/(view.ymax-view.ymin)*ph;
+ const tick=(v,span)=>v.toFixed(Math.max(0,Math.min(7,2-Math.floor(Math.log10(span||1)))));
+ const clip='clip-'+key;
+ let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" data-view-key="${key}" data-plot-height="${H}" style="touch-action:none;cursor:grab" role="img" aria-label="Force versus time graph"><rect width="${W}" height="${H}" fill="white"/><defs><clipPath id="${clip}"><rect x="${L}" y="${T}" width="${pw}" height="${ph}"/></clipPath></defs>`;
  for(let i=0;i<=5;i++){const xx=L+pw*i/5,yy=T+ph*i/5;
  if(o.grid)svg+=`<path d="M${xx} ${T}v${ph}M${L} ${yy}h${pw}" stroke="#dbe2e8" fill="none"/>`;
- svg+=`<g fill="#263548" font-family="Arial,sans-serif" font-size="13"><text x="${xx}" y="${H-30}" text-anchor="middle">${(end*i/5).toFixed(2)}</text><text x="${L-10}" y="${yy+4}" text-anchor="end">${(top-(top-bottom)*i/5).toFixed(0)}</text></g>`;
+ svg+=`<g fill="#263548" font-family="Arial,sans-serif" font-size="13"><text x="${xx}" y="${H-30}" text-anchor="middle">${tick(view.xmin+(view.xmax-view.xmin)*i/5,view.xmax-view.xmin)}</text><text x="${L-10}" y="${yy+4}" text-anchor="end">${tick(view.ymax-(view.ymax-view.ymin)*i/5,view.ymax-view.ymin)}</text></g>`;
  }
  svg+=`<path d="M${L} ${T}v${ph}h${pw}" stroke="#263548" fill="none"/><g font-family="Arial,sans-serif" font-size="14" fill="#263548"><text x="${W/2}" y="${H-5}" text-anchor="middle">Time from recording start (s)</text><text transform="translate(18 ${H/2}) rotate(-90)" text-anchor="middle">Force (lbf)</text></g>`;
  const colors=['#006c91','#b7410e','#6246a5','#007c58','#ab2670','#725015'];
  const legend=[];
  items.forEach((l,i)=>{const color=o.palette==='mono'?'#111':colors[i%colors.length],dash=i%4===0?'':i%4===1?'9 4':i%4===2?'3 3':'12 3 3 3';
- const pts=chartPoints(l.points,RATE[l.mode]).map(p=>`${x(p.x).toFixed(2)},${y(p.y).toFixed(2)}`).join(' ');
- svg+=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${o.width}" stroke-dasharray="${dash}"/>`;
+ const hz=RATE[l.mode],start=Math.max(0,Math.min(l.points.length-1,Math.floor(view.xmin*hz)-1)),stop=Math.max(start+1,Math.min(l.points.length,Math.ceil(view.xmax*hz)+2));
+ const pts=chartPoints(l.points.slice(start,stop),hz).map(p=>({...p,x:p.x+start/hz})).map(p=>`${x(p.x).toFixed(2)},${y(p.y).toFixed(2)}`).join(' ');
+ svg+=`<polyline clip-path="url(#${clip})" points="${pts}" fill="none" stroke="${color}" stroke-width="${o.width}" stroke-dasharray="${dash}"/>`;
  legend.push(`<span style="display:inline-block;margin:4px 16px 4px 0"><svg width="36" height="12" viewBox="0 0 36 12" style="display:inline-block;width:36px;min-width:0;height:12px"><path d="M0 6H36" stroke="${color}" stroke-width="${o.width}" stroke-dasharray="${dash}"/></svg> ${escapeHTML(l.name)} (ID ${l.id})</span>`);
  });
- if(o.limits&&limit!==null)svg+=`<path d="M${L} ${y(limit)}h${pw}" stroke="#c02222" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${L+5}" y="${Math.max(T+14,y(limit)-5)}" fill="#a01010" font-family="Arial,sans-serif" font-size="13">Entered ${items[0].mode==='dynamic'?'peak limit':'hold threshold'}: ${limit} lbf</text>`;
- return `<figure>${svg}</svg><figcaption>${legend.join('')}</figcaption></figure>`;
+ if(o.limits&&limit!==null&&limit>=view.ymin&&limit<=view.ymax)svg+=`<path d="M${L} ${y(limit)}h${pw}" stroke="#c02222" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${L+5}" y="${Math.max(T+14,y(limit)-5)}" fill="#a01010" font-family="Arial,sans-serif" font-size="13">Entered ${items[0].mode==='dynamic'?'peak limit':'hold threshold'}: ${limit} lbf</text>`;
+ return `<figure>${o.interactive?graphToolbar(key):''}${svg}</svg><figcaption>${legend.join('')}<div>View: ${view.xmin.toPrecision(6)}–${view.xmax.toPrecision(6)} s · ${view.ymin.toPrecision(6)}–${view.ymax.toPrecision(6)} lbf. Statistics use the full recordings.</div></figcaption></figure>`;
 }
 function reportTable(rows){
  const fmt=v=>v===null?'—':Number(v).toFixed(3);
@@ -236,12 +294,12 @@ function reportFigures(items,o){
  return ['dynamic','static'].map(mode=>{const group=known.filter(l=>l.mode===mode);return group.length?`<h3>${mode==='dynamic'?'Dynamic':'Static'} comparison</h3>${reportGraph(group,o)}`:'';}).join('');
 }
 function refreshReport(){
- try{const items=reportSelection(),o=reportOptions();$('reportError').textContent='';$('reportCount').textContent=`${items.length} checked recordings included. ${items.filter(l=>l.mode==='unknown').length} unassigned (no timing or force-check result).`;
- $('reportPreview').innerHTML=items.length?reportTable(items.map(l=>reportMetric(l,o)))+reportFigures(items,o):'<p>Check recordings in the list, then open Export report.</p>';
+ try{const items=reportSelection(),o={...reportOptions(),interactive:true};$('reportError').textContent='';$('reportCount').textContent=`${items.length} checked recordings included. ${items.filter(l=>l.mode==='unknown').length} unassigned (no timing or force-check result).`;
+ $('reportPreview').innerHTML=items.length?reportTable(items.map(l=>reportMetric(l,o)))+reportFigures(items,o):'<p>Check recordings in the list, then open Export report.</p>';bindReportViews();
  }catch(e){$('reportError').textContent=e.message;$('reportPreview').textContent='Correct the report settings to update the preview.';}
 }
 function openReport(){ $('reportDialog').showModal();refreshReport(); }
-const REPORT_METHOD='Peak uses every imported force sample. Recording length is sample count / sampling rate. Dynamic average is the arithmetic mean of samples ≥500 lbf; it is a review metric, not a verified standard arresting-force calculation. *Static hold span is (N−1) / rate for the longest uninterrupted run at or above the entered threshold; both force and duration are required. Checks use unrounded values. Graphs preserve bucket minima and maxima, use no smoothing, show the full recording and align at recording start. Unknown rates have no timed graph. No full Z359.13 compliance determination is made.';
+const REPORT_METHOD='Peak uses every imported force sample. Recording length is sample count / sampling rate. Dynamic average is the arithmetic mean of samples ≥500 lbf; it is a review metric, not a verified standard arresting-force calculation. *Static hold span is (N−1) / rate for the longest uninterrupted run at or above the entered threshold; both force and duration are required. Checks use unrounded values. Graphs preserve bucket minima and maxima, use no smoothing, use the preview zoom/pan ranges captured at export and align at recording start; the results table uses the full recordings. Unknown rates have no timed graph. No full Z359.13 compliance determination is made.';
 function reportDocument(items,o,stamp){
  const rows=items.map(l=>reportMetric(l,o));
  const pairs=[['Report ID',o.id],['Product / batch',o.product],['Tested by',o.tester],['Test date',o.date],['Standard edition',o.edition],['Procedure / clause',o.procedure],['Instrument / calibration',o.calibration],['Generated',stamp]];
@@ -258,6 +316,7 @@ function reportCSV(rows,o,stamp){
 }
 function exportReport(kind){
  try{const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Check at least one recording to export.');
+ o.views=Object.fromEntries(Object.entries(graphFrames).map(([k,f])=>[k,{...(graphViews[k]||f.view)}]));
  const stamp=new Date().toISOString(),rows=items.map(l=>reportMetric(l,o));$('reportError').textContent='';
  if(kind==='csv')return reportDownload(reportCSV(rows,o,stamp),'text/csv;charset=utf-8','csv');
  if(kind==='json')return reportDownload(JSON.stringify({schema:'linescale-test-evidence-v1',generated:stamp,overallCompliance:'Pending full requirements review',method:REPORT_METHOD,settings:o,results:rows,recordings:items.map(l=>({id:l.id,name:l.name,mode:l.mode,metadata:l.metadata,forceSamplesLbf:l.points}))},null,2),'application/json','json');
@@ -266,6 +325,7 @@ function exportReport(kind){
  const popup=window.open('','_blank');if(!popup)throw Error('Allow pop-ups for this app, or download the report and print it after opening.');popup.opener=null;popup.document.open();popup.document.write(html);popup.document.close();popup.focus();popup.print();
  }catch(e){$('reportError').textContent=e.message;}
 }
+
 
 render();
 </script></body></html>
