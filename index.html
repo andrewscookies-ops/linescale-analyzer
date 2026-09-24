@@ -59,7 +59,7 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <p class="muted">The PDF uses your browser’s print dialog. The downloaded HTML report includes its graphs and opens offline. Evidence data includes all selected force samples. Overall Z359.13 compliance remains pending review of the complete test requirements.</p>
 <p class="muted">Graph controls: scroll / pinch to zoom, drag to pan, or use the buttons. Double-click or Reset / Fit restores automatic sizing. Exports capture these preview ranges.</p><div id="reportPreview" style="background:#fff;color:#172130;border-radius:10px;padding:16px;overflow:auto"></div>
 </dialog>
-<style>.report-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 16px}.report-fields label{display:flex;flex-direction:column;align-items:stretch;margin:8px 0}.report-fields input[type=checkbox]{width:18px}.report-fields select{width:100%}#reportDialog>label{display:block}#reportDialog textarea{display:block;width:100%;font:inherit;background:#101923;color:var(--text);border:1px solid #344458;border-radius:9px;padding:10px}#reportDialog details{margin:16px 0}#reportDialog summary{cursor:pointer;font-weight:650}#reportPreview svg{display:block;width:100%;min-width:400px}#reportPreview figure{margin:12px 0}#reportPreview figcaption{font-size:12px;overflow-wrap:anywhere}#reportPreview table{color:#172130}#reportPreview th{position:static;background:#eaf0f4;color:#172130}.graph-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:12px 0}.graph-tools label{display:flex!important;flex-direction:row!important;gap:6px;margin:0!important}.graph-tools button,.graph-tools select{font-size:12px;padding:6px 10px}#mainGraphInteraction canvas{touch-action:none;cursor:grab}</style>
+<style>.report-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 16px}.report-fields label{display:flex;flex-direction:column;align-items:stretch;margin:8px 0}.report-fields input[type=checkbox]{width:18px}.report-fields select{width:100%}#reportDialog>label{display:block}#reportDialog textarea{display:block;width:100%;font:inherit;background:#101923;color:var(--text);border:1px solid #344458;border-radius:9px;padding:10px}#reportDialog details{margin:16px 0}#reportDialog summary{cursor:pointer;font-weight:650}#reportPreview svg{display:block;width:100%;min-width:400px}#reportPreview figure{margin:12px 0}#reportPreview figcaption{font-size:12px;overflow-wrap:anywhere}#reportPreview table{color:#172130}#reportPreview th{position:static;background:#eaf0f4;color:#172130}.graph-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:12px 0}.graph-tools label{display:flex!important;flex-direction:row!important;gap:6px;margin:0!important}.graph-tools button,.graph-tools select{font-size:12px;padding:6px 10px}#mainGraphInteraction canvas{touch-action:none;cursor:grab}.graph-line-editor{margin-bottom:12px}.graph-line-list{max-height:220px;overflow:auto}.graph-line-row{display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #64748b55}.graph-line-row label{display:flex;flex-direction:column;align-items:start;font-size:12px;margin:0!important;gap:4px}.graph-line-row input{width:150px!important;font-size:12px}.graph-line-row input[type=color]{width:48px!important;height:36px;padding:3px}.graph-line-row button{font-size:12px;padding:7px}.graph-line-editor strong{font-size:12px}#reportPreview .graph-line-editor label,#reportPreview .graph-line-editor .muted{color:#4b5b6c}</style>
 <dialog id="shareDialog" class="share-dialog" aria-labelledby="shareTitle" onclick="if(event.target===this)this.close()">
 <div class="share-heading"><h2 id="shareTitle">Share LineScale Analyzer</h2><button type="button" onclick="document.getElementById('shareDialog').close()" aria-label="Close share dialog" autofocus>✕</button></div>
 <p class="muted">Send the app link or let someone scan the QR code.</p>
@@ -182,9 +182,64 @@ function draw(){
  const chosen=comparison?logs.filter(l=>l.mode===$('mode').value&&l.selected):(current?[current]:[]);
  $('chartError').textContent=comparison&&!chosen.length?'Select logs in the list to compare.':'';
  if(chart)chart.destroy();
- chart=new Chart($('chart').getContext('2d'),{type:'line',data:{datasets:chosen.map(l=>({label:l.name,data:chartPoints(l.points,RATE[l.mode]),borderColor:`hsl(${(l.id*137.508)%360},75%,68%)`,borderWidth:1.5,pointRadius:0,tension:0,fill:false}))},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,plugins:{legend:{display:comparison,labels:{color:'#c1cede',boxWidth:12}},tooltip:{backgroundColor:'#172433',titleColor:'#edf3fa',bodyColor:'#c1cede',borderColor:'#36516a',borderWidth:1}},scales:{x:{type:'linear',grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Time from recording start (seconds)',color:'#9dadc1'}},y:{grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Force (lb)',color:'#9dadc1'}}}}});
+ chart=new Chart($('chart').getContext('2d'),{type:'line',plugins:[graphLinePlugin],data:{datasets:chosen.map(l=>({label:l.name,data:chartPoints(l.points,RATE[l.mode]),borderColor:`hsl(${(l.id*137.508)%360},75%,68%)`,borderWidth:1.5,pointRadius:0,tension:0,fill:false}))},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,plugins:{legend:{display:comparison,labels:{color:'#c1cede',boxWidth:12}},tooltip:{backgroundColor:'#172433',titleColor:'#edf3fa',bodyColor:'#c1cede',borderColor:'#36516a',borderWidth:1}},scales:{x:{type:'linear',grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Time from recording start (seconds)',color:'#9dadc1'}},y:{grid:{color:'#263345'},ticks:{color:'#9dadc1'},title:{display:true,text:'Force (lb)',color:'#9dadc1'}}}}});
  updateMainView(chosen);
 }
+const graphLines={};let nextGraphLine=1;
+function addGraphLine(key,axis){
+ const v=graphViews[key]||graphFrames[key]?.view;if(!v)return;
+ const line={id:nextGraphLine++,axis,value:Number(((axis==='force'?v.ymin+v.ymax:v.xmin+v.xmax)/2).toPrecision(6)),label:'',color:axis==='force'?'#b34800':'#7956c4'};
+ (graphLines[key]??=[]).push(line);return line;
+}
+function updateGraphLine(key,id,field,value){
+ const line=(graphLines[key]||[]).find(l=>l.id===Number(id));if(!line)return false;
+ if(field==='value'){if(String(value).trim()===''||!Number.isFinite(Number(value)))return false;line.value=Number(value);}
+ else if(field==='color'){if(!/^#[0-9a-f]{6}$/i.test(value))return false;line.color=value;}
+ else if(field==='label')line.label=String(value).slice(0,100);
+ else return false;return true;
+}
+function removeGraphLine(key,id){graphLines[key]=(graphLines[key]||[]).filter(l=>l.id!==Number(id));}
+function graphLineText(line){return `${line.label?line.label+' · ':''}${line.value} ${line.axis==='force'?'lbf':'s'}`;}
+function graphLineEditor(key){
+ const lines=graphLines[key]||[];
+ return `<div class="graph-line-editor" data-line-key="${key}"><div class="graph-tools"><strong>Reference lines (${lines.length})</strong><button type="button" data-add-line="force">＋ Force line</button><button type="button" data-add-line="time">＋ Time marker</button></div>${lines.length?`<div class="graph-line-list">${lines.map(l=>`<div class="graph-line-row" data-line-id="${l.id}"><label>${l.axis==='force'?'Force (lbf)':'Time (s)'}<input type="number" step="any" required data-line-field="value" value="${l.value}" aria-label="${l.axis==='force'?'Force':'Time'} value for line ${l.id}"></label><label>Label<input type="text" maxlength="100" data-line-field="label" value="${escapeHTML(l.label)}" placeholder="Optional label" aria-label="Label for line ${l.id}"></label><label>Color<input type="color" data-line-field="color" value="${l.color}" aria-label="Color for line ${l.id}"></label><button type="button" data-remove-line="${l.id}" aria-label="Remove line ${l.id}">Remove</button></div>`).join('')}</div><p class="muted">Lines outside the visible range remain saved. Pan or zoom out to see them. Lines are visual references, not acceptance criteria.</p>`:''}</div>`;
+}
+function bindGraphLines(root,redraw){
+ if(root.dataset.linesBound)return;root.dataset.linesBound='true';
+ root.addEventListener('click',e=>{const add=e.target.closest('[data-add-line]'),remove=e.target.closest('[data-remove-line]');if(!add&&!remove)return;const key=(add||remove).closest('[data-line-key]').dataset.lineKey;
+  if(add){const line=addGraphLine(key,add.dataset.addLine);redraw();if(line){const input=root.querySelector(`[data-line-id="${line.id}"] [data-line-field="value"]`);input?.focus();input?.select();}}
+  else{removeGraphLine(key,remove.dataset.removeLine);redraw();}
+ });
+ root.addEventListener('change',e=>{const field=e.target.dataset.lineField;if(!field)return;const key=e.target.closest('[data-line-key]').dataset.lineKey,id=e.target.closest('[data-line-id]').dataset.lineId;
+  if(!updateGraphLine(key,id,field,e.target.value)){e.target.setCustomValidity('Enter a finite numeric value.');e.target.reportValidity();return;}
+  e.target.setCustomValidity('');refreshLineDrawing(root,key);
+ });
+ root.addEventListener('input',e=>{const field=e.target.dataset.lineField;if(!field)return;const key=e.target.closest('[data-line-key]').dataset.lineKey,id=e.target.closest('[data-line-id]').dataset.lineId;if(updateGraphLine(key,id,field,e.target.value)){e.target.setCustomValidity('');refreshLineDrawing(root,key);}else e.target.setCustomValidity('Enter a finite numeric value.');});
+}
+const graphLinePlugin={id:'referenceLines',afterDraw(c){
+ const key=c.$lineKey;if(!key||!c.chartArea)return;
+ const {ctx,chartArea:a,scales}=c;ctx.save();ctx.beginPath();ctx.rect(a.left,a.top,a.right-a.left,a.bottom-a.top);ctx.clip();ctx.font='12px sans-serif';
+ for(const line of graphLines[key]||[]){const horizontal=line.axis==='force',pos=(horizontal?scales.y:scales.x).getPixelForValue(line.value);if(!Number.isFinite(pos)||pos<(horizontal?a.top:a.left)||pos>(horizontal?a.bottom:a.right))continue;
+  ctx.strokeStyle=line.color;ctx.fillStyle=line.color;ctx.lineWidth=1.5;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(horizontal?a.left:pos,horizontal?pos:a.top);ctx.lineTo(horizontal?a.right:pos,horizontal?pos:a.bottom);ctx.stroke();ctx.setLineDash([]);
+  ctx.save();if(horizontal){ctx.fillText(graphLineText(line),a.left+5,Math.max(a.top+14,pos-5));}else{ctx.translate(Math.max(a.left+14,pos-5),a.bottom-6);ctx.rotate(-Math.PI/2);ctx.fillText(graphLineText(line),0,0);}ctx.restore();
+ }ctx.restore();
+}};
+function reportReferenceLines(key,o,view,x,y,L,T,pw,ph,clip){
+ const lines=o.annotations?o.annotations[key]||[]:graphLines[key]||[];let svg='';
+ for(const line of lines){const horizontal=line.axis==='force',pos=horizontal?y(line.value):x(line.value);if(!Number.isFinite(pos)||pos<(horizontal?T:L)||pos>(horizontal?T+ph:L+pw))continue;
+  const text=escapeHTML(graphLineText(line));svg+=`<g clip-path="url(#${clip})"><path d="${horizontal?`M${L} ${pos}h${pw}`:`M${pos} ${T}v${ph}`}" stroke="${line.color}" stroke-width="1.5" stroke-dasharray="7 4" fill="none"/><text ${horizontal?`x="${L+5}" y="${Math.max(T+14,pos-5)}"`:`transform="translate(${Math.max(L+14,pos-5)} ${T+ph-6}) rotate(-90)"`} fill="${line.color}" font-family="Arial,sans-serif" font-size="12">${text}</text></g>`;
+ }
+ const caption=lines.length?`<div>Reference lines: ${lines.map(l=>escapeHTML(graphLineText(l))).join('; ')}. Lines outside this view are not drawn.</div>`:'';
+ return {svg,caption};
+}
+
+function refreshLineDrawing(root,key){
+ if(root.id==='mainGraphInteraction'){if(chart)chart.update('none');return;}
+ const figure=root.querySelector(`[data-line-key="${key}"]`)?.closest('figure');if(!figure)return;
+ const items=reportSelection().filter(l=>RATE[l.mode]);const groups=reportOptions().layout==='individual'?items.map(l=>[l]):['dynamic','static'].map(mode=>items.filter(l=>l.mode===mode));const group=groups.find(g=>g.length&&graphKey(g)===key);if(!group)return;
+ const holder=document.createElement('div');holder.innerHTML=reportGraph(group,reportOptions());figure.querySelector('svg[data-view-key]').replaceWith(holder.querySelector('svg[data-view-key]'));figure.querySelector('figcaption').replaceWith(holder.querySelector('figcaption'));
+}
+
 // Views are keyed by the exact recording set, shared by the chart and report.
 const graphViews={},graphFrames={},graphAxes={};
 function graphKey(items){return 'g-'+items.map(l=>l.mode+'-'+l.id).sort().join('-');}
@@ -198,7 +253,7 @@ function graphPan(v,dx,dy,axis='both'){
  const x=axis==='force'?0:dx*(v.xmax-v.xmin),y=axis==='time'?0:dy*(v.ymax-v.ymin);
  return {xmin:v.xmin-x,xmax:v.xmax-x,ymin:v.ymin+y,ymax:v.ymax+y};
 }
-function graphToolbar(key){return `<div class="graph-tools" data-graph-tools="${key}"><button type="button" data-view-action="in" aria-label="Zoom in">＋</button><button type="button" data-view-action="out" aria-label="Zoom out">−</button><label>Axes <select aria-label="Zoom and pan axes" data-view-axis><option value="both" ${!graphAxes[key]||graphAxes[key]==='both'?'selected':''}>Both</option><option value="time" ${graphAxes[key]==='time'?'selected':''}>Time</option><option value="force" ${graphAxes[key]==='force'?'selected':''}>Force</option></select></label><button type="button" data-view-action="left" aria-label="Pan left">←</button><button type="button" data-view-action="right" aria-label="Pan right">→</button><button type="button" data-view-action="up" aria-label="Pan up">↑</button><button type="button" data-view-action="down" aria-label="Pan down">↓</button><button type="button" data-view-action="reset">Reset / Fit</button></div>`;}
+function graphToolbar(key){return `<div class="graph-tools" data-graph-tools="${key}"><button type="button" data-view-action="in" aria-label="Zoom in">＋</button><button type="button" data-view-action="out" aria-label="Zoom out">−</button><label>Axes <select aria-label="Zoom and pan axes" data-view-axis><option value="both" ${!graphAxes[key]||graphAxes[key]==='both'?'selected':''}>Both</option><option value="time" ${graphAxes[key]==='time'?'selected':''}>Time</option><option value="force" ${graphAxes[key]==='force'?'selected':''}>Force</option></select></label><button type="button" data-view-action="left" aria-label="Pan left">←</button><button type="button" data-view-action="right" aria-label="Pan right">→</button><button type="button" data-view-action="up" aria-label="Pan up">↑</button><button type="button" data-view-action="down" aria-label="Pan down">↓</button><button type="button" data-view-action="reset">Reset / Fit</button></div>${graphLineEditor(key)}`;}
 function graphAction(key,action,redraw){
  const v=graphViews[key]||graphFrames[key]?.view;if(!v)return;
  if(action==='reset')delete graphViews[key];
@@ -208,6 +263,7 @@ function graphAction(key,action,redraw){
 }
 function bindGraphGestures(root,findGraph,redraw){
  if(root.dataset.viewBound)return;root.dataset.viewBound='true';
+ bindGraphLines(root,redraw);
  const pointers=new Map();let gesture=null;
  const fraction=(e,rect)=>({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height});
  function rebase(){if(!gesture)return;gesture.base={...(graphViews[gesture.key]||graphFrames[gesture.key].view)};gesture.start=[...pointers.values()];}
@@ -232,6 +288,7 @@ function updateMainView(items){
  const key=graphKey(items),v=graphViews[key];
  if(v){Object.assign(chart.options.scales.x,{min:v.xmin,max:v.xmax});Object.assign(chart.options.scales.y,{min:v.ymin,max:v.ymax});chart.update('none');}
  graphFrames[key]={view:{xmin:chart.scales.x.min,xmax:chart.scales.x.max,ymin:chart.scales.y.min,ymax:chart.scales.y.max}};
+ chart.$lineKey=key;chart.update('none');
  tools.innerHTML=graphToolbar(key);tools.dataset.currentKey=key;
  bindGraphGestures($('mainGraphInteraction'),e=>{if(e.target!==$('chart')||!chart?.chartArea||!$('mainGraphTools').dataset.currentKey)return;const r=$('chart').getBoundingClientRect(),a=chart.chartArea;return {key:$('mainGraphTools').dataset.currentKey,rect:{left:r.left+a.left*r.width/chart.width,top:r.top+a.top*r.height/chart.height,width:(a.right-a.left)*r.width/chart.width,height:(a.bottom-a.top)*r.height/chart.height}};},draw);
 }
@@ -282,7 +339,8 @@ function reportGraph(items,o){
  legend.push(`<span style="display:inline-block;margin:4px 16px 4px 0"><svg width="36" height="12" viewBox="0 0 36 12" style="display:inline-block;width:36px;min-width:0;height:12px"><path d="M0 6H36" stroke="${color}" stroke-width="${o.width}" stroke-dasharray="${dash}"/></svg> ${escapeHTML(l.name)} (ID ${l.id})</span>`);
  });
  if(o.limits&&limit!==null&&limit>=view.ymin&&limit<=view.ymax)svg+=`<path d="M${L} ${y(limit)}h${pw}" stroke="#c02222" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${L+5}" y="${Math.max(T+14,y(limit)-5)}" fill="#a01010" font-family="Arial,sans-serif" font-size="13">Entered ${items[0].mode==='dynamic'?'peak limit':'hold threshold'}: ${limit} lbf</text>`;
- return `<figure>${o.interactive?graphToolbar(key):''}${svg}</svg><figcaption>${legend.join('')}<div>View: ${view.xmin.toPrecision(6)}–${view.xmax.toPrecision(6)} s · ${view.ymin.toPrecision(6)}–${view.ymax.toPrecision(6)} lbf. Statistics use the full recordings.</div></figcaption></figure>`;
+ const references=reportReferenceLines(key,o,view,x,y,L,T,pw,ph,clip);svg+=references.svg;
+ return `<figure>${o.interactive?graphToolbar(key):''}${svg}</svg><figcaption>${legend.join('')}${references.caption}<div>View: ${view.xmin.toPrecision(6)}–${view.xmax.toPrecision(6)} s · ${view.ymin.toPrecision(6)}–${view.ymax.toPrecision(6)} lbf. Statistics use the full recordings.</div></figcaption></figure>`;
 }
 function reportTable(rows){
  const fmt=v=>v===null?'—':Number(v).toFixed(3);
@@ -315,7 +373,8 @@ function reportCSV(rows,o,stamp){
  return [header,...rows.map(r=>[o.id,stamp,o.edition,o.procedure,r.id,r.name,r.mode,r.rate,r.samples,r.peak,r.duration,r.average,r.holdSpan,o.peak,o.force,o.hold,r.result,'Pending full requirements review'])].map(row=>row.map(cell).join(',')).join('\r\n');
 }
 function exportReport(kind){
- try{const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Check at least one recording to export.');
+ try{if($('reportPreview').querySelector?.('.graph-line-editor input:invalid'))throw Error('Enter valid reference-line values before exporting.');const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Check at least one recording to export.');
+ o.annotations=Object.fromEntries(Object.entries(graphLines).map(([key,lines])=>[key,lines.map(line=>({...line}))]));
  o.views=Object.fromEntries(Object.entries(graphFrames).map(([k,f])=>[k,{...(graphViews[k]||f.view)}]));
  const stamp=new Date().toISOString(),rows=items.map(l=>reportMetric(l,o));$('reportError').textContent='';
  if(kind==='csv')return reportDownload(reportCSV(rows,o,stamp),'text/csv;charset=utf-8','csv');
