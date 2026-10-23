@@ -54,6 +54,16 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <label><input id="reportGrid" type="checkbox" checked onchange="refreshReport()">Gridlines</label>
 <label><input id="reportLimits" type="checkbox" checked onchange="refreshReport()">Entered force limit lines</label>
 </div></details>
+<details id="runningLogSetup"><summary>Running spreadsheet · Google Sheets</summary>
+<p class="muted">Each enabled export appends the selected drop/static results to <a href="https://docs.google.com/spreadsheets/d/1jDy8ay1wCgoEPvtCCQDmCf8JJ9qii0nfzFYsOfjrsLU/edit" target="_blank" rel="noopener">Testing Data</a>. Re-exporting the same test run, source and specimen skips duplicate rows. Use a new report ID for a new test run.</p>
+<p><a href="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec" target="_blank" rel="noopener">Open Google connection / get my key</a></p><div class="report-fields"><label>Google connection URL<input id="logEndpoint" type="url" value="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec"></label><label>Private connection key<input id="logKey" type="password" autocomplete="off" placeholder="From the Google connection page"></label></div>
+<div class="toolbar"><label><input id="logRemember" type="checkbox">Remember connection on this browser</label><button onclick="saveLogConnection()">Save connection</button><button onclick="disconnectLog()">Disconnect</button></div>
+<label><input id="logAuto" type="checkbox">Append results to Google Sheets with each export</label>
+<p id="logStatus" class="muted" role="status" aria-live="polite"></p><button id="logRetry" onclick="retryLogExport()" hidden>Retry last log export</button>
+<p class="muted">Google opens a signed-in receipt window with saved / skipped counts. Allow pop-ups for the app. If logging is interrupted, Retry resends the last export safely. Static average uses samples ≥5,000 lbf; hold time uses the entered force threshold, defaulting to 5,000 lbf. Reference lines and graph ranges are retained in the receipt metadata.</p>
+<details><summary>Specimen details for these recordings</summary><p class="muted">Fill in the matching spreadsheet columns. Each recording has its own specimen details; blanks stay blank.</p><div id="logSpecimens"></div></details>
+</details>
+<style>.log-specimen{border:1px solid #344458;border-radius:9px;margin:14px 0;padding:12px}.log-specimen legend{font-size:12px;overflow-wrap:anywhere}#runningLogSetup input[type=checkbox]{width:17px}#runningLogSetup>label{display:flex}</style>
 <p id="reportCount" role="status"></p><p id="reportError" role="alert" style="color:#ffb5b5"></p>
 <div class="toolbar"><button class="primary" onclick="exportReport('print')">Print / Save PDF</button><button onclick="exportReport('html')">Download report</button><button onclick="exportReport('csv')">Results CSV</button><button onclick="exportReport('json')">Evidence data</button></div>
 <p class="muted">The PDF uses your browser’s print dialog. The downloaded HTML report includes its graphs and opens offline. Evidence data includes all selected force samples. Overall Z359.13 compliance remains pending review of the complete test requirements.</p>
@@ -353,7 +363,7 @@ function reportFigures(items,o){
 }
 function refreshReport(){
  try{const items=reportSelection(),o={...reportOptions(),interactive:true};$('reportError').textContent='';$('reportCount').textContent=`${items.length} checked recordings included. ${items.filter(l=>l.mode==='unknown').length} unassigned (no timing or force-check result).`;
- $('reportPreview').innerHTML=items.length?reportTable(items.map(l=>reportMetric(l,o)))+reportFigures(items,o):'<p>Check recordings in the list, then open Export report.</p>';bindReportViews();
+ $('reportPreview').innerHTML=items.length?reportTable(items.map(l=>reportMetric(l,o)))+reportFigures(items,o):'<p>Check recordings in the list, then open Export report.</p>';bindReportViews();refreshLogSpecimens(items);
  }catch(e){$('reportError').textContent=e.message;$('reportPreview').textContent='Correct the report settings to update the preview.';}
 }
 function openReport(){ $('reportDialog').showModal();refreshReport(); }
@@ -372,7 +382,7 @@ function reportCSV(rows,o,stamp){
  const header=['Report ID','Generated UTC','Standard edition','Procedure','ID','Filename','Type','Rate Hz','Sample count','Peak lbf','Recording s','Review average >=500 lbf','Static observed hold span s','User peak max lbf','User hold force lbf','User hold time s','Entered force check','Overall compliance'];
  return [header,...rows.map(r=>[o.id,stamp,o.edition,o.procedure,r.id,r.name,r.mode,r.rate,r.samples,r.peak,r.duration,r.average,r.holdSpan,o.peak,o.force,o.hold,r.result,'Pending full requirements review'])].map(row=>row.map(cell).join(',')).join('\r\n');
 }
-function exportReport(kind){
+function exportReportFile(kind){
  try{if($('reportPreview').querySelector?.('.graph-line-editor input:invalid'))throw Error('Enter valid reference-line values before exporting.');const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Check at least one recording to export.');
  o.annotations=Object.fromEntries(Object.entries(graphLines).map(([key,lines])=>[key,lines.map(line=>({...line}))]));
  o.views=Object.fromEntries(Object.entries(graphFrames).map(([k,f])=>[k,{...(graphViews[k]||f.view)}]));
@@ -385,7 +395,73 @@ function exportReport(kind){
  }catch(e){$('reportError').textContent=e.message;}
 }
 
+const RUNNING_SHEET_URL='https://docs.google.com/spreadsheets/d/1jDy8ay1wCgoEPvtCCQDmCf8JJ9qii0nfzFYsOfjrsLU/edit';
+let logConnection=null,logPending=null,loggingBusy=false;
+const LOG_SPECIMEN_FIELDS=[['material','Material description'],['materialManufacturer','Material manufacturer'],['materialSerial','Material serial / specimen ID'],['thread','Thread description'],['threadManufacturer','Thread manufacturer'],['threadSerial','Thread serial'],['stitch','Stitch pattern']];
+function loadLogConnection(){
+ try{logConnection=JSON.parse(sessionStorage.getItem('linescaleLogConnection')||localStorage.getItem('linescaleLogConnection')||'null');logPending=JSON.parse(localStorage.getItem('linescalePendingExport')||'null');}catch(e){logConnection=null;}
+ if(logConnection){$('logEndpoint').value=logConnection.url;$('logKey').value=logConnection.key;$('logRemember').checked=!!localStorage.getItem('linescaleLogConnection');$('logAuto').checked=true;}
+ updateLogStatus();
+}
+function saveLogConnection(){
+ const url=$('logEndpoint').value.trim(),key=$('logKey').value.trim();
+ if(!/^https:\/\/script\.google\.com\/(?:macros\/s|a\/macros\/theadventureguild\.com\/s)\/[A-Za-z0-9_-]+\/exec$/.test(url)||key.length<32){$('logStatus').textContent='Enter the deployed Google /exec URL and your connection key.';return;}
+ logConnection={url,key};sessionStorage.setItem('linescaleLogConnection',JSON.stringify(logConnection));
+ if($('logRemember').checked)localStorage.setItem('linescaleLogConnection',JSON.stringify(logConnection));else localStorage.removeItem('linescaleLogConnection');
+ $('logAuto').checked=true;updateLogStatus();
+}
+function disconnectLog(){logConnection=null;sessionStorage.removeItem('linescaleLogConnection');localStorage.removeItem('linescaleLogConnection');$('logKey').value='';$('logAuto').checked=false;updateLogStatus();}
+function updateLogStatus(message){const status=$('logStatus');if(status)status.textContent=message||(logConnection?'Connection configured. Google will show a receipt for each export.':'Google connection setup is required before appending.');const retry=$('logRetry');if(retry)retry.hidden=!logPending;}
+function logSpecimenFields(items){return items.map(l=>`<fieldset class="log-specimen"><legend>${escapeHTML(l.name)} · ${l.mode==='dynamic'?'Drop':'Static'} test</legend><div class="report-fields">${LOG_SPECIMEN_FIELDS.map(([key,title])=>`<label>${title}<input data-specimen-log="${l.id}" data-specimen-field="${key}" value="${escapeHTML(l.specimen?.[key]||'')}" oninput="setLogSpecimen(this)"></label>`).join('')}</div></fieldset>`).join('');}
+function setLogSpecimen(input){const l=logs.find(l=>l.id===Number(input.dataset.specimenLog));if(l){l.specimen??={};l.specimen[input.dataset.specimenField]=input.value;}}
+function refreshLogSpecimens(items){const target=$('logSpecimens');if(target)target.innerHTML=logSpecimenFields(items);}
+async function makeLogPayload(items,o){
+ if(!o.id)throw Error('Enter a report / sample set ID to identify this test run.');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(o.date))throw Error('Enter the test date before logging.');
+ if(items.some(l=>!RATE[l.mode]))throw Error('Assign every selected recording to Dynamic or Static before logging.');
+ const rows=[];
+ for(const l of items){
+  const identity=JSON.stringify({run:o.id,date:o.date,name:l.name,mode:l.mode,metadata:l.metadata,points:l.points,specimen:l.specimen||{}});
+  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity));const recordKey=Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('');
+  const metric={...reportMetric(l,{...o,force:o.force??5000,hold:o.hold??0}),result:reportMetric(l,o).result};
+  rows.push({...metric,recordKey,testDate:o.date,reportId:o.id,product:o.product,tester:o.tester,edition:o.edition,procedure:o.procedure,calibration:o.calibration,notes:o.notes,specimen:{...(l.specimen||{})},average:l.mode==='static'?l.stats.average:metric.average,holdForce:l.mode==='static'?(o.force??5000):null,graphViews:o.views||{},referenceLines:o.annotations||{}});
+ }
+ return {schema:'linescale-running-log-v1',exportId:crypto.randomUUID(),created:new Date().toISOString(),rows};
+}
+function submitLogPayload(payload,popup){
+ const form=document.createElement('form');form.method='POST';form.action=logConnection.url;form.target='LineScaleGoogleReceipt';
+ for(const [name,value]of Object.entries({key:logConnection.key,payload:JSON.stringify(payload)})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);}
+ document.body.append(form);form.submit();form.remove();
+ updateLogStatus('Sent to Google. Check the receipt window for saved / skipped rows. Retry uses the same sample keys to prevent duplicates.');popup?.focus();
+}
+function retryLogExport(){
+ if(!logConnection){updateLogStatus('Configure the Google connection first.');return;}
+ if(!logPending){updateLogStatus('No pending export to resend.');return;}
+ const popup=window.open('about:blank','LineScaleGoogleReceipt');if(!popup){updateLogStatus('Allow pop-ups for this app, then click Retry last log export.');return;}
+ submitLogPayload(logPending,popup);
+}
+async function exportReport(kind){
+ if(loggingBusy){updateLogStatus('An export is already being prepared.');return;}
+ if(!logConnection||!$('logAuto').checked)return exportReportFile(kind);
+ let popup;
+ try{
+  if($('reportPreview').querySelector?.('.graph-line-editor input:invalid'))throw Error('Enter valid reference-line values before exporting.');
+  const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Select at least one recording to export.');
+  if(!o.id||!o.date||items.some(l=>!RATE[l.mode]))throw Error('To log this export, enter the report ID and test date and assign all selected recordings.');
+  // Preserve metadata, graph state and specimen fields before async hashing.
+  o.views=Object.fromEntries(Object.entries(graphFrames).map(([key,f])=>[key,{...(graphViews[key]||f.view)}]));o.annotations=Object.fromEntries(Object.entries(graphLines).map(([key,lines])=>[key,lines.map(l=>({...l}))]));
+  const snapshot=items.map(l=>({...l,metadata:{...l.metadata},specimen:{...(l.specimen||{})}}));
+  exportReportFile(kind);
+  if($('reportError').textContent)return;
+  popup=window.open('about:blank','LineScaleGoogleReceipt');loggingBusy=true;
+  const payload=await makeLogPayload(snapshot,o);logPending=payload;
+  try{localStorage.setItem('linescalePendingExport',JSON.stringify(payload));}catch(e){updateLogStatus('Pending export is kept in this tab; browser storage is unavailable.');}
+  if(!popup){updateLogStatus('Report exported. Google logging is pending: allow pop-ups, then click Retry last log export.');return;}
+  submitLogPayload(payload,popup);
+ }catch(e){if(popup)popup.close();$('reportError').textContent=e.message;}finally{loggingBusy=false;const retry=$('logRetry');if(retry)retry.hidden=!logPending;}
+}
 
-render();
+
+render();loadLogConnection();
 </script></body></html>
 
