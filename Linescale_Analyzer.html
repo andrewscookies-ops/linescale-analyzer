@@ -13,7 +13,7 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 </style></head><body><main class="container"><header class="brandbar"><div class="brand">The Adventure Guild</div><div class="brand-actions"><button type="button" class="pill" onclick="openShare()" aria-haspopup="dialog">Share ↗</button><a class="pill" href="#setup" onclick="document.getElementById('setup').open=true">DEVICE SETUP ↗</a></div></header>
 <section class="card hero"><h1>LineScale Analyzer</h1><div class="muted">Import up to 50 CSVs. Keep the useful recordings, remove the extras, and compare each test type separately.</div>
 <div class="quickstart" aria-label="How to use"><div><b><span>1</span> Import your logs</b><p>Click Import CSV files. Hold Command on Mac or Ctrl on Windows to choose multiple files.</p></div><div><b><span>2</span> Review a folder</b><p>Choose Dynamic or Static below. Click a filename to see its graph. Use Previous / Next to review the rest.</p></div><div><b><span>3</span> Compare or remove</b><p>Check the logs you want, then turn on Compare selected logs or click Remove selected. Undo restores the last removal.</p></div></div>
-<div class="toolbar"><label for="mode">View folder</label><select id="mode" onchange="changeMode()"><option value="dynamic">Dynamic · 1,280 Hz</option><option value="static">Static · 40 Hz</option><option value="unknown">Needs assignment</option></select><button onclick="openReport()">Export report</button><button class="primary" id="loadButton" onclick="document.getElementById('files').click()">＋ Import CSV files</button><input id="files" type="file" accept=".csv,.txt" multiple hidden onchange="loadFiles(this.files)"><span id="count"></span></div>
+<div class="toolbar"><label for="mode">View folder</label><select id="mode" onchange="changeMode()"><option value="dynamic">Dynamic · 1,280 Hz</option><option value="static">Static · 40 Hz</option><option value="unknown">Needs assignment</option></select><button onclick="openReport()">Export report</button><button onclick="openSpreadsheetAppend()">Append to spreadsheet</button><button class="primary" id="loadButton" onclick="document.getElementById('files').click()">＋ Import CSV files</button><input id="files" type="file" accept=".csv,.txt" multiple hidden onchange="loadFiles(this.files)"><span id="count"></span></div>
 <div class="muted">Files sort automatically: 1,280 Hz → Dynamic · 40 Hz → Static. Use lbf (pounds-force) recordings. Unknown rates appear in Needs assignment.</div><div id="messages" role="status" aria-live="polite"></div></section>
 
 <details id="setup" class="card setup"><summary><div>Set up your LineScale 3i+<span>Open for exact settings: Dynamic · 500 lb trigger / Static · 2-minute capture</span></div></summary>
@@ -26,18 +26,14 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <div class="toolbar"><button onclick="selectVisible(true)">Select filtered</button><button onclick="selectVisible(false)">Deselect filtered</button><button class="danger" id="removeSelected" onclick="removeSelected()">Remove selected</button><button id="undo" onclick="undoRemove()">Undo removal</button></div><div class="muted"><strong>Preview:</strong> click a filename. <strong>Select:</strong> check its box.<br>“Select filtered” selects the visible rows. Removing or comparing uses all checked logs in this folder, including any hidden by a search. Your original files are never deleted.</div>
 <div class="table-wrap"><table><thead><tr><th>Select</th><th>File / activity</th><th>Peak (lb)</th><th>Length (s)</th><th></th></tr></thead><tbody id="rows"></tbody></table></div><p id="empty" class="muted"></p></section>
 <section class="card"><p class="eyebrow">Graph preview</p><h2 id="previewName">Choose a log to preview</h2><div class="toolbar"><button id="previous" onclick="navigate(-1)">← Previous</button><button id="next" onclick="navigate(1)">Next →</button><button id="removeCurrent" class="danger" onclick="removeLogs([currentId])">Remove this log</button><label><input id="compare" type="checkbox" onchange="draw()">Compare selected logs</label></div><div id="metrics" class="metrics"></div><div id="chartError" role="status"></div><div id="mainGraphInteraction"><div id="mainGraphTools"></div><p class="muted">Scroll / pinch to zoom · drag to pan · double-click to fit. The report keeps this view for the same recording set.</p><div class="chart"><canvas id="chart"></canvas></div></div><div class="muted"><strong>Reading the graph:</strong> time runs left to right; force runs bottom to top. Recordings are aligned at their start.<details class="metric-help"><summary>What do the numbers mean?</summary><ul><li><strong>Peak:</strong> highest force in the file.</li><li><strong>Recording:</strong> total recorded length, including pre-capture.</li><li><strong>Dynamic average:</strong> average of samples at or above 500 lb.</li><li><strong>Static hold:</strong> longest uninterrupted run at or above 5,000 lb.</li><li><strong>No activity:</strong> no samples reached that folder’s threshold. Review before removing.</li></ul>These are review metrics, not certification verdicts.</details></div></section></div><footer class="footer"><span>Created by Andrew Harris with AI assistance for use by The Adventure Guild.</span><span>Keep this tab open: reloading clears this session. Original CSVs stay on your computer.</span></footer></main><dialog id="reportDialog" class="share-dialog" style="width:min(1000px,calc(100% - 32px))" aria-labelledby="reportTitle">
-<div class="share-heading"><h2 id="reportTitle">Export drop / static report</h2><button onclick="$('reportDialog').close()" aria-label="Close report builder">✕</button></div>
-<p class="muted">Select the recordings that belong to your sample set. Export a report with numbers and graphs for your Z359.13 review.</p>
-<div class="report-fields">
-<label>Include<select id="reportScope" onchange="refreshReport()"><option value="folder">Checked logs in current folder</option><option value="all">Checked logs across all folders</option></select></label>
-<label>Report / sample set ID<input id="reportId" placeholder="e.g. TAG-2026-001"></label>
-<label>Product / batch<input id="reportProduct" placeholder="Model and lot number"></label>
+<div class="share-heading"><h2 id="reportTitle">Drop / static results</h2><button onclick="$('reportDialog').close()" aria-label="Close report builder">✕</button></div>
+<p class="muted">Select your sample set to create a report or append results to the running spreadsheet.</p>
+<div class="report-fields"><label>Include<select id="reportScope" onchange="refreshReport()"><option value="folder">Checked logs in current folder</option><option value="all">Checked logs across all folders</option></select></label><label>Report / sample set ID<input id="reportId" placeholder="e.g. TAG-2026-001"></label><label>Test date<input id="reportDate" type="date"></label></div>
+<details><summary>Optional report details &amp; notes</summary><div class="report-fields"><label>Product / batch<input id="reportProduct" placeholder="Model and lot number"></label>
 <label>Tested by<input id="reportTester" placeholder="Name / laboratory"></label>
-<label>Test date<input id="reportDate" type="date"></label>
 <label>Standard edition<input id="reportEdition" placeholder="Enter the edition used"></label>
 <label>Procedure / clause reference<input id="reportProcedure" placeholder="Approved procedure and revision"></label>
-<label>Instrument / calibration reference<input id="reportCalibration" placeholder="Serial number, certificate and date"></label>
-</div>
+<label>Instrument / calibration reference<input id="reportCalibration" placeholder="Serial number, certificate and date"></label></div><label>Test setup, conditioning, other measurements and review notes<textarea id="reportNotes" rows="3" placeholder="Document specimen IDs, test mass, free-fall distance, deployment / elongation measurements, conditioning, observations and supporting records required by your procedure."></textarea></label></details>
 <details><summary>Optional force checks from your approved procedure</summary>
 <p class="muted">Blank means not evaluated. These are user-entered force checks, not built-in Z359.13 acceptance criteria. Dynamic average is a review metric and is not evaluated for compliance.</p>
 <div class="report-fields">
@@ -45,8 +41,8 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <label>Static hold minimum force (lbf)<input id="reportForce" type="number" min="0" step="any" placeholder="Not evaluated" oninput="refreshReport()"></label>
 <label>Static hold minimum time (s)<input id="reportHold" type="number" min="0" step="any" placeholder="Not evaluated" oninput="refreshReport()"></label>
 </div></details>
-<label>Test setup, conditioning, other measurements and review notes<textarea id="reportNotes" rows="3" placeholder="Document specimen IDs, test mass, free-fall distance, deployment / elongation measurements, conditioning, observations and supporting records required by your procedure."></textarea></label>
-<details open><summary>Graph appearance</summary><div class="report-fields">
+
+<details><summary>Graph appearance</summary><div class="report-fields">
 <label>Layout<select id="reportLayout" onchange="refreshReport()"><option value="individual">One graph per recording</option><option value="overlay">Compare by test type</option></select></label>
 <label>Colors<select id="reportPalette" onchange="refreshReport()"><option value="color">Color</option><option value="mono">Black and white / dashed</option></select></label>
 <label>Line width<select id="reportWidth" onchange="refreshReport()"><option value="1">Thin</option><option value="2" selected>Medium</option><option value="3">Bold</option></select></label>
@@ -55,9 +51,11 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 <label><input id="reportLimits" type="checkbox" checked onchange="refreshReport()">Entered force limit lines</label>
 </div></details>
 <details id="runningLogSetup"><summary>Running spreadsheet · Google Sheets</summary>
-<p class="muted">Each enabled export appends the selected drop/static results to <a href="https://docs.google.com/spreadsheets/d/1jDy8ay1wCgoEPvtCCQDmCf8JJ9qii0nfzFYsOfjrsLU/edit" target="_blank" rel="noopener">Testing Data</a>. Re-exporting the same test run, source and specimen skips duplicate rows. Use a new report ID for a new test run.</p>
-<p><a href="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec" target="_blank" rel="noopener">Open Google connection / get my key</a></p><div class="report-fields"><label>Google connection URL<input id="logEndpoint" type="url" value="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec"></label><label>Private connection key<input id="logKey" type="password" autocomplete="off" placeholder="From the Google connection page"></label></div>
+<p class="muted">Append the selected drop/static results to <a href="https://docs.google.com/spreadsheets/d/1jDy8ay1wCgoEPvtCCQDmCf8JJ9qii0nfzFYsOfjrsLU/edit" target="_blank" rel="noopener">Testing Data</a>. Re-exporting the same test run, source and specimen skips duplicate rows. Use a new report ID for a new test run.</p>
+<details id="logConnectionSettings"><summary>Connection settings</summary><p><a href="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec" target="_blank" rel="noopener">Open Google connection / get my key</a></p><div class="report-fields"><label>Google connection URL<input id="logEndpoint" type="url" value="https://script.google.com/a/macros/theadventureguild.com/s/AKfycbz5u_cJywjyjvpKpnUPE1ZkHkZQQFuJKjpwmENtik2dBPjCNKbBSaf92RSuTS7TMqTR/exec"></label><label>Private connection key<input id="logKey" type="password" autocomplete="off" placeholder="From the Google connection page"></label></div>
 <div class="toolbar"><label><input id="logRemember" type="checkbox">Remember connection on this browser</label><button onclick="saveLogConnection()">Save connection</button><button onclick="disconnectLog()">Disconnect</button></div>
+</details>
+<div class="toolbar"><button class="primary" onclick="appendToSpreadsheet()">Append to spreadsheet</button></div>
 <label><input id="logAuto" type="checkbox">Append results to Google Sheets with each export</label>
 <p id="logStatus" class="muted" role="status" aria-live="polite"></p><button id="logRetry" onclick="retryLogExport()" hidden>Retry last log export</button>
 <p class="muted">Google opens a signed-in receipt window with saved / skipped counts. Allow pop-ups for the app. If logging is interrupted, Retry resends the last export safely. Static average uses samples ≥5,000 lbf; hold time uses the entered force threshold, defaulting to 5,000 lbf. Reference lines and graph ranges are retained in the receipt metadata.</p>
@@ -441,23 +439,27 @@ function retryLogExport(){
  const popup=window.open('about:blank','LineScaleGoogleReceipt');if(!popup){updateLogStatus('Allow pop-ups for this app, then click Retry last log export.');return;}
  submitLogPayload(logPending,popup);
 }
+function openSpreadsheetAppend(){openReport();$('runningLogSetup').open=true;}
+function appendToSpreadsheet(){return exportReport('append');}
 async function exportReport(kind){
+ const appendOnly=kind==='append';
  if(loggingBusy){updateLogStatus('An export is already being prepared.');return;}
- if(!logConnection||!$('logAuto').checked)return exportReportFile(kind);
+ if(!appendOnly&&(!logConnection||!$('logAuto').checked))return exportReportFile(kind);
  let popup;
  try{
+  $('reportError').textContent='';
+  if(!logConnection){$('runningLogSetup').open=true;$('logConnectionSettings').open=true;throw Error('Save your Google Sheets connection before appending.');}
   if($('reportPreview').querySelector?.('.graph-line-editor input:invalid'))throw Error('Enter valid reference-line values before exporting.');
-  const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Select at least one recording to export.');
-  if(!o.id||!o.date||items.some(l=>!RATE[l.mode]))throw Error('To log this export, enter the report ID and test date and assign all selected recordings.');
+  const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Select at least one recording to '+(appendOnly?'append.':'export.'));
+  if(!o.id||!o.date||items.some(l=>!RATE[l.mode]))throw Error('Enter the report ID and test date and assign all selected recordings before appending.');
   // Preserve metadata, graph state and specimen fields before async hashing.
   o.views=Object.fromEntries(Object.entries(graphFrames).map(([key,f])=>[key,{...(graphViews[key]||f.view)}]));o.annotations=Object.fromEntries(Object.entries(graphLines).map(([key,lines])=>[key,lines.map(l=>({...l}))]));
   const snapshot=items.map(l=>({...l,metadata:{...l.metadata},specimen:{...(l.specimen||{})}}));
-  exportReportFile(kind);
-  if($('reportError').textContent)return;
+  if(!appendOnly){exportReportFile(kind);if($('reportError').textContent)return;}
   popup=window.open('about:blank','LineScaleGoogleReceipt');loggingBusy=true;
   const payload=await makeLogPayload(snapshot,o);logPending=payload;
   try{localStorage.setItem('linescalePendingExport',JSON.stringify(payload));}catch(e){updateLogStatus('Pending export is kept in this tab; browser storage is unavailable.');}
-  if(!popup){updateLogStatus('Report exported. Google logging is pending: allow pop-ups, then click Retry last log export.');return;}
+  if(!popup){updateLogStatus((appendOnly?'Spreadsheet append is pending.':'Report exported. Google logging is pending.')+' Allow pop-ups, then click Retry last log export.');return;}
   submitLogPayload(payload,popup);
  }catch(e){if(popup)popup.close();$('reportError').textContent=e.message;}finally{loggingBusy=false;const retry=$('logRetry');if(retry)retry.hidden=!logPending;}
 }
