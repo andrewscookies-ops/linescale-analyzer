@@ -421,10 +421,11 @@ async function makeLogPayload(items,o){
  if(items.some(l=>!RATE[l.mode]))throw Error('Assign every selected recording to Dynamic or Static before logging.');
  const rows=[];
  for(const l of items){
-  const identity=JSON.stringify({run:o.id,date:o.date,name:l.name,mode:l.mode,metadata:l.metadata,points:l.points,specimen:l.specimen||{}});
+  const specimen=Object.fromEntries(LOG_SPECIMEN_FIELDS.map(([key])=>[key,String(l.specimen?.[key]||'').trim()]));
+  const identity=JSON.stringify({run:o.id,date:o.date,name:l.name,mode:l.mode,metadata:l.metadata,points:l.points,specimen});
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity));const recordKey=Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('');
   const metric={...reportMetric(l,{...o,force:o.force??5000,hold:o.hold??0}),result:reportMetric(l,o).result};
-  rows.push({...metric,recordKey,testDate:o.date,reportId:o.id,product:o.product,tester:o.tester,edition:o.edition,procedure:o.procedure,calibration:o.calibration,notes:o.notes,specimen:{...(l.specimen||{})},average:l.mode==='static'?l.stats.average:metric.average,holdForce:l.mode==='static'?(o.force??5000):null,graphViews:o.views||{},referenceLines:o.annotations||{}});
+  rows.push({...metric,recordKey,testDate:o.date,reportId:o.id,product:o.product,tester:o.tester,edition:o.edition,procedure:o.procedure,calibration:o.calibration,notes:o.notes,specimen,average:l.mode==='static'?l.stats.average:metric.average,holdForce:l.mode==='static'?(o.force??5000):null,graphViews:o.views||{},referenceLines:o.annotations||{}});
  }
  return {schema:'linescale-running-log-v1',exportId:crypto.randomUUID(),created:new Date().toISOString(),rows};
 }
