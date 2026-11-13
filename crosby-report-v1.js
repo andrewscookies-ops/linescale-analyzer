@@ -16,7 +16,7 @@ var project={
  fail:"The anchor did not meet the stated test criteria and must not be used.",
  ni:"The anchor was not tested; its use is subject to TAG policy.",
  model:"Crosby Straightpoint Tensionmeter BLD6T5",serial:"40554",
- minimum:3000,hold:10,graphsPerPage:2,exportFormat:"word",exportContent:"complete"
+ minimum:3000,hold:10,graphsPerPage:3,exportFormat:"word",exportContent:"complete"
 };
 var fieldMap=[
  ["date","Testing date"],["client","Client"],["location","Location"],["manager","Project manager"],
@@ -164,7 +164,7 @@ function install(){
  '</details>',
  '<div class="cs-panel"><h3>4 · Export reports</h3>',
  '<div class="cs-report-controls"><label>Specified hold duration (seconds)<input id="csHold" type="number" min="0" step="1" value="10"></label>',
- '<label>Graphs per page<select id="csPerPage"><option value="2" selected>2 · larger graphs</option><option value="3">3 · compact graphs</option></select></label></div>',
+ '<label>Graphs per page<select id="csPerPage"><option value="2">2 · larger graphs</option><option value="3" selected>3 · compact graphs</option></select></label></div>',
  '<p class="cs-muted">The minimum line is a visual reference, not a certification decision. Use Include to select which recordings appear in the exports. Graphs-only exports omit the introductory pages in either format; complete reports include project fields, anchor summary and graph evidence.</p>',
  '<div class="cs-report-controls" aria-label="Export format and content"><label>File format<select id="csExportFormat"><option value="word">Word (.docx)</option><option value="pdf">PDF (.pdf)</option></select></label><label>Report content<select id="csExportContent"><option value="complete">Complete report</option><option value="graphs">Graphs only</option></select></label></div>',
  '<div class="cs-export"><button type="button" class="cs-primary" id="csExport">Export Word — Complete report</button><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div>',
