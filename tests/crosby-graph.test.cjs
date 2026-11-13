@@ -130,11 +130,16 @@ test('new recordings open across their full duration without changing markers', 
   assert.equal(t.view, null);
 });
 
-test('import keeps existing threshold and fallback marker placement', () => {
+test('default import hides A/B markers unless the full required hold was measured', () => {
   const h = load();
-  assert.deepEqual(markerTimes(h.parseCrosby('hold.csv', csv())), [10, 12]);
+  const shortHold = h.parseCrosby('hold.csv', csv());
+  assert.deepEqual(markerTimes(shortHold), [0, 10]);
+  assert.equal(shortHold.style.showA, false);
+  assert.equal(shortHold.style.showB, false);
   const low = h.parseCrosby('low.csv', csv([['08:00:00:000', 0], ['08:00:08:000', 200]]));
-  assert.deepEqual(markerTimes(low), [2, 6]);
+  assert.deepEqual(markerTimes(low), [0, 8]);
+  assert.equal(low.style.showA, false);
+  assert.equal(low.style.showB, false);
 });
 
 test('explicit views survive graph construction and Focus A–B remains available', () => {
@@ -320,6 +325,8 @@ test('Snap changes only selected marker positions and refreshes their controls',
   Object.assign(t.style, { a: 9.5, b: 12.4, showA: false, band: true, above: true, below: true, aboveScope: 'markers' });
   const other = recording(h, { name: 'other.csv', id: '2', anchor: 2 });
   h.S.tests = [t, other]; h.refresh();
+  // Snap intentionally switches the selected test into manual-marker mode.
+  t.markerManual = true;
   const points = t.points, view = plain(t.view), otherBefore = plain(other);
   const reportWithoutMarkers = () => {
     const report = plain(h.reportData());
