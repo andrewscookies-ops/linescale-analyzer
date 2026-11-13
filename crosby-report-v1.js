@@ -158,7 +158,7 @@ function install(){
  '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csBelow"> Fill below graph line</label><label>Color<input type="color" id="csBelowColor" value="#3b82f6"></label><label>Opacity<input type="range" id="csBelowAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
  '<div class="cs-toolbar"><button type="button" id="csPng">Download this graph (PNG)</button><button type="button" id="csClearStyle">Clear graph shading</button></div>',
  '<label>Graph / anchor comments (editable)<textarea id="csComments" rows="2" placeholder="Anchor identification, creep observations, notes"></textarea></label></div>',
- '<details id="csProjectDetails"><summary>3 · Editable Word report content (everything except company heading)</summary>',
+ '<details id="csProjectDetails"><summary>3 · Word Report Content</summary>',
  '<div class="cs-fields" id="csProjectFields"></div>',
  '<div class="cs-toolbar"><label>Site plan / diagram (optional)<input id="csPlanFile" type="file" accept="image/png,image/jpeg"></label><span class="cs-muted" id="csPlanName">No diagram selected</span></div>',
  '</details>',
