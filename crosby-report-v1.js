@@ -433,22 +433,22 @@ async function exportPDF(){
    var pageNum=Math.floor(i/per)+1;
    if(slot===0){
     pdf.setFont("helvetica","bold");pdf.setFontSize(11);pdf.setTextColor(15,32,49);
-    pdf.text("Ground Anchor Testing · Graph Evidence",margin,35);
+    pdf.text("Ground Anchor Testing - Graph Evidence",margin,35);
     pdf.setFont("helvetica","normal");pdf.setFontSize(9);pdf.setTextColor(82,96,111);
-    pdf.text((project.client||"Project")+" · "+(project.date||""),margin,50);
+    pdf.text((project.client||"Project")+" | "+(project.date||""),margin,50);
     pdf.setDrawColor(170,181,190);pdf.line(margin,57,612-margin,57);
    }
    var slotHeight=per===3?227:325,top=69+slot*slotHeight;
    var t=tests[i],stat=holdStats(t,project.minimum),anchor=t.title||("Anchor "+t.anchor);
    pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.setTextColor(20,37,53);
-   pdf.text("Test "+(isMapped(t)?String(t.anchor):t.id)+" — "+anchor.slice(0,65),margin,top+12);
+   pdf.text("Test "+(isMapped(t)?String(t.anchor):t.id)+" - "+anchor.slice(0,65),margin,top+12);
    var available=per===3?176:246;
    pdf.addImage(img,"PNG",margin,top+20,width,available,"chart"+i,"FAST");
    pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(76,87,98);
-   pdf.text("Crosby "+t.id+" · Peak "+Math.round(t.peak).toLocaleString()+" lb · Observed hold "+stat.hold.toFixed(1)+" s · Rating "+t.rating,margin,top+available+31);
-   if(t.comments)pdf.text(pdf.splitTextToSize(t.comments, width).slice(0,2),margin,top+available+43);
+   pdf.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s | Rating "+t.rating,margin,top+available+31);
+   if(t.comments)pdf.text(pdf.splitTextToSize(t.comments, width).slice(0,per===3?1:2),margin,top+available+43);
    pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(100,106,115);
-   pdf.text("The Adventure Guild · Inspection Documentation Report  |  Graph page "+pageNum,margin,765);
+   if(slot===0)pdf.text("The Adventure Guild | Inspection Documentation Report | Graph page "+pageNum,margin,765);
   });
   pdf.save(fileStem()+"_graphs.pdf");
   status("Graph-only PDF exported: "+tests.length+" graphs, "+Math.ceil(tests.length/per)+" pages.");
