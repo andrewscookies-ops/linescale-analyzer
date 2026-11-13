@@ -5,6 +5,7 @@ on:
       - 'crosby-report-v1.js'
       - 'assets/tag-logo.base64'
       - 'tests/word-export.integration.cjs'
+      - 'tests/crosby-graph.test.cjs'
       - '.github/workflows/verify-word-export.yml'
   workflow_dispatch:
 jobs:
