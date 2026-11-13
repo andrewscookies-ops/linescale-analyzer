@@ -1,0 +1,54 @@
+
+/* TAG Load-cell Analyzer · Crosby reporting · isolated from LineScale */
+#csWorkflow{border-color:#345349;background:linear-gradient(135deg,#172c2b,#131b26);}
+#csWorkflow h2{margin:0 0 4px}
+#csWorkflow .cs-intro{margin:6px 0 17px;color:var(--muted);max-width:920px}
+#csWorkflow .cs-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:12px 0}
+#csWorkflow button{width:auto}
+#csWorkflow .cs-primary{background:#115e4d;color:#effff8;border-color:#1d8a71;font-weight:650}
+#csWorkflow .cs-primary:hover{background:#16725e}
+#csWorkflow .cs-flag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:8px;background:#284d43;color:#b8ffea;font-size:12px}
+#csWorkflow .cs-panel{background:#0f1821;border:1px solid #324454;border-radius:12px;padding:15px;margin:13px 0}
+#csWorkflow .cs-panel h3{font-size:15px;margin:0 0 12px}
+#csWorkflow .cs-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+#csWorkflow label{display:block;color:#bad0d6;font-size:12px;line-height:1.4}
+#csWorkflow input:not([type=checkbox]):not([type=range]):not([type=file]),#csWorkflow select,#csWorkflow textarea{width:100%;margin-top:4px;padding:9px;background:#0a141b;border:1px solid #405464;color:#edf3fa;border-radius:8px}
+#csWorkflow textarea{resize:vertical;font:inherit;min-height:82px}
+#csWorkflow input[type=color]{height:36px;min-width:38px;width:100%;padding:2px;border-radius:8px;border:1px solid #405464;background:#0a141b;cursor:pointer}
+#csWorkflow input[type=checkbox]{accent-color:#67e8c4;vertical-align:middle}
+#csWorkflow input[type=range]{width:100%;accent-color:#67e8c4}
+#csWorkflow details{margin:13px 0;border:1px solid #324454;background:#101923;border-radius:12px;padding:13px}
+#csWorkflow details>summary{cursor:pointer;font-weight:650;color:#d5e9e8}
+#csWorkflow details[open]>summary{margin-bottom:12px}
+#csWorkflow .cs-scroll{overflow:auto;max-width:100%}
+#csWorkflow table{width:100%;border-collapse:collapse;min-width:800px}
+#csWorkflow th,#csWorkflow td{font-size:12px;padding:7px;vertical-align:middle;text-align:left;border-bottom:1px solid #2c3c4c}
+#csWorkflow td input,#csWorkflow td select{margin:0!important;min-width:94px;font-size:12px}
+#csWorkflow th{color:#b2cabf;font-weight:650;background:#13252a;white-space:nowrap}
+#csWorkflow tr.cs-selected{background:#1b3935}
+#csWorkflow tr:hover{background:#1d2c36}
+#csWorkflow .cs-id{font-size:11px;color:#c9e3da}
+#csWorkflow .cs-muted{font-size:12px;color:var(--muted);line-height:1.5}
+#csWorkflow .cs-warning{color:#ffce8c}
+#csWorkflow .cs-status{font-size:12px;margin:10px 0;min-height:20px;color:#9ef4d5}
+#csWorkflow .cs-inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#csWorkflow .cs-chart{position:relative;height:370px;background:white;border-radius:11px;overflow:hidden;padding:10px}
+#csWorkflow .cs-edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px;margin:11px 0}
+#csWorkflow .cs-fill-row{display:grid;grid-template-columns:minmax(135px,1.2fr) 75px minmax(90px,1fr);gap:11px;align-items:center;margin:11px 0}
+#csWorkflow .cs-fill-row label.cs-check{font-size:13px}
+#csWorkflow .cs-fill-row input[type=color]{margin:0}
+#csWorkflow .cs-fill-row input[type=range]{margin:0}
+#csWorkflow .cs-mode-toggle{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#csWorkflow .cs-mini{font-size:11px;color:var(--muted)}
+#csWorkflow .cs-graph-stats{font-size:12px;display:flex;flex-wrap:wrap;gap:12px;color:#d9e9ec;margin:8px 0}
+#csWorkflow .cs-export{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+#csWorkflow .cs-export button{min-width:155px}
+#csWorkflow button:disabled{opacity:.5;cursor:not-allowed}
+#csWorkflow .cs-field-full{grid-column:1/-1}
+#csWorkflow .cs-report-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+@media(max-width:700px){
+ #csWorkflow{padding:15px}
+ #csWorkflow .cs-chart{height:300px;padding:4px}
+ #csWorkflow .cs-fill-row{grid-template-columns:minmax(125px,1fr) 55px minmax(82px,1fr);gap:7px}
+ #csWorkflow .cs-toolbar button,#csWorkflow .cs-export button{flex:1 1 145px}
+}
