@@ -126,7 +126,8 @@ function install(){
  '<p class="cs-muted">Drag the A and B vertical lines on the graph, or enter their times below. Each graph keeps its own independent shading settings.</p>',
  '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step=".1" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
  '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step=".1" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
- '<label>Fill above/below scope<select id="csScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
+ '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
+ '<label>Below-line fill range<select id="csBelowScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
  '</div>',
  '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csBand"> Fill between markers</label><label>Color<input type="color" id="csBandColor" value="#f59e0b"></label><label>Opacity<input type="range" id="csBandAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
  '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csAbove"> Fill above graph line</label><label>Color<input type="color" id="csAboveColor" value="#22c55e"></label><label>Opacity<input type="range" id="csAboveAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
@@ -168,7 +169,7 @@ function currentStyleFromUI(){
  s.band=$("csBand").checked;s.bandColor=$("csBandColor").value;s.bandAlpha=numeric("csBandAlpha",.2);
  s.above=$("csAbove").checked;s.aboveColor=$("csAboveColor").value;s.aboveAlpha=numeric("csAboveAlpha",.2);
  s.below=$("csBelow").checked;s.belowColor=$("csBelowColor").value;s.belowAlpha=numeric("csBelowAlpha",.2);
- s.aboveScope=$("csScope").value;s.belowScope=$("csScope").value;
+ s.aboveScope=$("csAboveScope").value;s.belowScope=$("csBelowScope").value;
  draw();
 }
 function setControl(id,value){var e=$(id);if(!e)return;if(e.type==="checkbox")e.checked=Boolean(value);else e.value=value;}
@@ -179,7 +180,7 @@ function loadStyle(){
  ["csBand",s.band],["csBandColor",s.bandColor],["csBandAlpha",s.bandAlpha],
  ["csAbove",s.above],["csAboveColor",s.aboveColor],["csAboveAlpha",s.aboveAlpha],
  ["csBelow",s.below],["csBelowColor",s.belowColor],["csBelowAlpha",s.belowAlpha],
- ["csScope",s.aboveScope]].forEach(function(x){setControl(x[0],x[1]);});
+ ["csAboveScope",s.aboveScope],["csBelowScope",s.belowScope]].forEach(function(x){setControl(x[0],x[1]);});
  $("csComments").value=t.comments||"";
 }
 function markerPoint(chart,x){
@@ -398,7 +399,7 @@ async function graphPNG(t){
  if(typeof Chart==="undefined")throw Error("Chart.js is not available.");
  var c=document.createElement("canvas");c.width=1200;c.height=455;
  c.style.width="1200px";c.style.height="455px";
- var ch=new Chart(c,graphConfig(t));ch.$crosby=t;ch.resize(1200,455);ch.update("none");
+ var cfg=graphConfig(t);cfg.options.responsive=false;var ch=new Chart(c,cfg);ch.$crosby=t;ch.update("none");
  var png=c.toDataURL("image/png");ch.destroy();return png;
 }
 async function graphImages(tests){
@@ -492,7 +493,7 @@ async function exportWord(){
   ch.push(paragraph(d,"Anchors",{heading:d.HeadingLevel.HEADING_1,pageBreakBefore:true}));
   ch.push(body("Minimum "+project.minimum.toLocaleString()+" lb | Hold duration "+project.hold+" s | Measuring device "+project.model+" | Serial "+project.serial));
   if(S.planImage){
-   ch.push(new d.Paragraph({children:[new d.ImageRun({type:S.planImage.type==="image/png"?"png":"jpg",data:S.planImage.bytes,transformation:{width:470,height:Math.round(470*S.planImage.ratio)}})],spacing:{after:100}}));
+   var planWidth=Math.min(470,Math.round(235/Math.max(.01,S.planImage.ratio)));ch.push(new d.Paragraph({children:[new d.ImageRun({type:S.planImage.type==="image/png"?"png":"jpg",data:S.planImage.bytes,transformation:{width:planWidth,height:Math.round(planWidth*S.planImage.ratio)}})],spacing:{after:100}}));
   }
   ch.push(docxTable(d,[["Anchor # and Location","Rating","Applied Load","Measuring Device","Test ID"]].concat(tests.map(function(t){
    return [t.title||("Anchor "+t.anchor),t.rating,Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id];
@@ -556,7 +557,7 @@ function bind(){
  $("csWindow").addEventListener("click",setWindow);
  $("csStyleAll").addEventListener("click",copyStyle);
  $("csClearStyle").addEventListener("click",clearStyle);
- ["csMarkerA","csMarkerB","csShowA","csShowB","csBand","csBandColor","csBandAlpha","csAbove","csAboveColor","csAboveAlpha","csBelow","csBelowColor","csBelowAlpha","csScope"].forEach(function(id){
+ ["csMarkerA","csMarkerB","csShowA","csShowB","csBand","csBandColor","csBandAlpha","csAbove","csAboveColor","csAboveAlpha","csBelow","csBelowColor","csBelowAlpha","csAboveScope","csBelowScope"].forEach(function(id){
   $(id).addEventListener("input",currentStyleFromUI);$(id).addEventListener("change",currentStyleFromUI);
  });
  $("csComments").addEventListener("input",function(){var t=selected();if(t)t.comments=this.value;});
