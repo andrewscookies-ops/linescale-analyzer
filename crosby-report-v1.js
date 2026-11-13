@@ -3,7 +3,7 @@
    Distinct from LineScale processing. Local CSV import; no uploads. */
 (function(){
 "use strict";
-var S={tests:[],current:0,chart:null,drag:null,planImage:null};
+var S={tests:[],current:0,chart:null,drag:null,planImage:null,axis:'both',gesture:null,pointers:new Map()};
 var $=function(id){return document.getElementById(id);};
 var template=function(){return {a:0,b:10,showA:true,showB:true,band:false,bandColor:"#f59e0b",bandAlpha:.18,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
 var project={
@@ -91,7 +91,7 @@ function parseCrosby(name,text){
  return {name:name,id:rawId,device:device,date:rows[hi+1]?.[cols.date]||"",originalUnit:Object.keys(unitSet).join(", "),
    points:points,duration:duration,peak:Math.max.apply(null,points.map(function(p){return p.y;})),
    anchor:num&&num<=999?num:null,title:num?"Anchor "+num:"Unassigned anchor",
-   rating:"Pending review",comments:"",style:sty,enabled:true};
+   rating:"Pending review",comments:"",style:sty,enabled:true,view:null};
 }
 function holdStats(t,threshold){
  var data=t.points,steps=[];for(var i=1;i<data.length;i++)if(data[i].x>data[i-1].x)steps.push(data[i].x-data[i-1].x);
@@ -117,13 +117,14 @@ function install(){
  box.innerHTML=[
  '<div class="cs-inline" style="justify-content:space-between"><div><p class="eyebrow">Crosby Straightpoint · distinct workflow</p><h2>Anchor load testing & report builder</h2></div><span class="cs-flag">Crosby CSV</span></div>',
  '<p class="cs-intro">Import the original Crosby reports, review the test-to-anchor mapping, annotate force-time graphs, and export a fully editable Word report or graph-only PDF pages for an existing report. All processing stays in this browser.</p>',
- '<div class="cs-toolbar"><button type="button" class="cs-primary" id="csImport">＋ Import Crosby CSVs</button><input id="csFiles" type="file" accept=".csv,text/csv" multiple hidden><span class="cs-muted" id="csCount">No Crosby tests loaded</span><button type="button" id="csDemo">Load a small example</button><button type="button" id="csReset">Clear imports</button></div>',
+ '<div class="cs-toolbar"><button type="button" class="cs-primary" id="csImport">＋ Import up to 50 Crosby CSVs</button><input id="csFiles" type="file" accept=".csv,text/csv" multiple hidden><span class="cs-muted" id="csCount">0 / 50 loaded</span><button type="button" id="csDemo">Load a small example</button><button type="button" id="csReset">Clear imports</button></div>',
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
  '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Set markers around load hold</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
+ '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted">Drag the A and B vertical lines on the graph, or enter their times below. Each graph keeps its own independent shading settings.</p>',
+ '<p class="cs-muted">Scroll / pinch to zoom, drag to pan, or double-click to fit. Drag A / B markers or enter their times below. Markers initially bracket the detected hold and each graph remembers its own view and shading.</p>',
  '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step=".1" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
  '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step=".1" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
  '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
@@ -240,8 +241,13 @@ var shadingPlugin={
  beforeDatasetsDraw:function(chart){overlay(chart,"fill");},
  afterDatasetsDraw:function(chart){overlay(chart,"markers");}
 };
+function fitCrosbyView(t){
+ var m=Math.max(project.minimum,t.peak)*1.17;
+ return {xmin:0,xmax:Math.max(1,t.duration),ymin:0,ymax:Math.max(500,Math.ceil(m/500)*500)};
+}
+function crosbyView(t){return t.view?Object.assign({},t.view):fitCrosbyView(t);}
 function graphConfig(t){
- var threshold=Math.max(0,project.minimum),max=Math.max(threshold,t.peak)*1.17;
+ var threshold=Math.max(0,project.minimum),max=Math.max(threshold,t.peak)*1.17,v=crosbyView(t);
  return {
   type:"line",
   data:{datasets:[
@@ -255,8 +261,8 @@ function graphConfig(t){
    parsing:false,normalized:true,
    plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{label:function(ctx){return ctx.datasetIndex===0?"Load: "+Math.round(ctx.parsed.y).toLocaleString()+" lb":"Minimum load";}}}},
    scales:{
-    x:{type:"linear",min:0,max:Math.max(1,t.duration),title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},ticks:{color:"#526479",maxTicksLimit:10},grid:{color:"#e4e8ec"}},
-    y:{type:"linear",min:0,suggestedMax:Math.ceil(max/500)*500,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",callback:function(v){return Number(v).toLocaleString();}},grid:{color:"#dfe5e9"}}
+    x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},ticks:{color:"#526479",maxTicksLimit:10},grid:{color:"#e4e8ec"}},
+    y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",callback:function(v){return Number(v).toLocaleString();}},grid:{color:"#dfe5e9"}}
    }
   }
  };
@@ -283,7 +289,7 @@ function renderRows(){
    +'<td><select data-prop="rating">'+options+'</select></td><td>'+Math.round(t.peak).toLocaleString()+'</td><td>'+m.hold.toFixed(1)+' s</td>'
    +'<td><input type="checkbox" data-prop="enabled" '+(t.enabled?"checked":"")+' aria-label="Include '+esc(t.name)+'"></td></tr>';
  }).join("");
- $("csCount").textContent=S.tests.length+" imported · "+ordered().length+" included";
+ $("csCount").textContent=S.tests.length+" / 50 loaded · "+ordered().length+" included";
 }
 function preview(i){
  if(!S.tests.length)return;
@@ -303,6 +309,7 @@ async function importFiles(files){
  var successes=0,errors=[];
  for(var i=0;i<files.length;i++){
   var file=files[i];
+  if(S.tests.length>=50){errors.push("50-file maximum reached; extra files were not imported.");break;}
   if(S.tests.some(function(x){return x.name===file.name;})){errors.push(file.name+": already imported");continue;}
   try{
    var parsed=parseCrosby(file.name,await file.text());
@@ -311,7 +318,7 @@ async function importFiles(files){
  }
  S.tests.sort(function(a,b){return (Number(a.anchor)||9999)-(Number(b.anchor)||9999)||a.name.localeCompare(b.name);});
  refresh();
- status(successes+" Crosby recording"+(successes===1?"":"s")+" imported."+ (errors.length?" "+errors.length+" skipped: "+errors.slice(0,2).join("; "):""),!!errors.length);
+ status(successes+" Crosby recording"+(successes===1?"":"s")+" imported ("+S.tests.length+" / 50 loaded)."+ (errors.length?" "+errors.length+" skipped: "+errors.slice(0,2).join("; "):""),!!errors.length);
 }
 function setWindow(){
  var t=selected();if(!t)return;
@@ -543,7 +550,7 @@ function bind(){
   else if(prop==="enabled")t.enabled=input.checked;
   else t[prop]=input.value;
   if(idx===S.current)draw();
-  $("csCount").textContent=S.tests.length+" imported · "+ordered().length+" included";
+  $("csCount").textContent=S.tests.length+" / 50 loaded · "+ordered().length+" included";
  });
  $("csRows").addEventListener("input",function(e){
   var input=e.target,idx=Number(input.closest("tr")?.dataset.index),t=S.tests[idx],prop=input.dataset.prop;
@@ -556,6 +563,10 @@ function bind(){
  $("csNext").addEventListener("click",function(){preview((S.current+1)%S.tests.length);});
  $("csWindow").addEventListener("click",setWindow);
  $("csStyleAll").addEventListener("click",copyStyle);
+ $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
+ document.querySelectorAll("#csWorkflow [data-cs-view]").forEach(function(btn){
+  btn.addEventListener("click",function(){crosbyAction(btn.dataset.csView);});
+ });
  $("csClearStyle").addEventListener("click",clearStyle);
  ["csMarkerA","csMarkerB","csShowA","csShowB","csBand","csBandColor","csBandAlpha","csAbove","csAboveColor","csAboveAlpha","csBelow","csBelowColor","csBelowAlpha","csAboveScope","csBelowScope"].forEach(function(id){
   $(id).addEventListener("input",currentStyleFromUI);$(id).addEventListener("change",currentStyleFromUI);
