@@ -38,7 +38,8 @@ const make=(id,anchor)=>({
  enabled:true,comments:'',markerManual:true,view:null,
  style:{a:10,b:11,showA:true,showB:true}
 });
-api.S.tests=[make(1,1),make(2,2)];
+// Match the full 16-anchor size of the reference report.
+api.S.tests=Array.from({length:16},(_,i)=>make(i+1,i+1));
 api.project.minimum=3000;
 (async()=>{
  await api.exportWord('complete');
@@ -47,6 +48,7 @@ api.project.minimum=3000;
  assert.match(exported.name,/\.docx$/);
  const bytes=Buffer.from(await exported.blob.arrayBuffer());
  assert.ok(bytes.length>5000,'Unexpectedly small DOCX');
+ assert.ok(exported.blob.type.includes('wordprocessingml'),'DOCX should have the Word MIME type');
  assert.equal(bytes.subarray(0,2).toString('utf8'),'PK');
  fs.writeFileSync(process.argv[2]||path.join(root,'word-export-smoke.docx'),bytes);
  console.log('Generated DOCX: '+bytes.length+' bytes');
