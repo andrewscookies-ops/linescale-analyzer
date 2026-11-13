@@ -16,7 +16,7 @@ var project={
  fail:"The anchor did not meet the stated test criteria and must not be used.",
  ni:"The anchor was not tested; its use is subject to TAG policy.",
  model:"Crosby Straightpoint Tensionmeter BLD6T5",serial:"40554",
- minimum:3000,hold:10,graphsPerPage:2
+ minimum:3000,hold:10,graphsPerPage:2,exportFormat:"word",exportContent:"complete"
 };
 var fieldMap=[
  ["date","Testing date"],["client","Client"],["location","Location"],["manager","Project manager"],
@@ -164,8 +164,9 @@ function install(){
  '<div class="cs-panel"><h3>4 · Export reports</h3>',
  '<div class="cs-report-controls"><label>Minimum test load (lb)<input id="csTarget" type="number" min="0" step="10" value="3000"></label><label>Specified hold duration (seconds)<input id="csHold" type="number" min="0" step="1" value="10"></label>',
  '<label>Graphs per page<select id="csPerPage"><option value="2" selected>2 · larger graphs</option><option value="3">3 · compact graphs</option></select></label></div>',
- '<p class="cs-muted">The minimum line is a visual reference, not a certification decision. Use Include to select which recordings appear in the exports. The graph-only PDF contains no cover pages, so you can insert it after page 2 of an existing Word report.</p>',
- '<div class="cs-export"><button type="button" class="cs-primary" id="csWord">Download complete editable Word report (.docx)</button><button type="button" class="cs-primary" id="csPdf">Download graph-only PDF</button><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div>',
+ '<p class="cs-muted">The minimum line is a visual reference, not a certification decision. Use Include to select which recordings appear in the exports. Graphs-only exports omit the introductory pages in either format; complete reports include project fields, anchor summary and graph evidence.</p>',
+ '<div class="cs-report-controls" aria-label="Export format and content"><label>File format<select id="csExportFormat"><option value="word">Word (.docx)</option><option value="pdf">PDF (.pdf)</option></select></label><label>Report content<select id="csExportContent"><option value="complete">Complete report</option><option value="graphs">Graphs only</option></select></label></div>',
+ '<div class="cs-export"><button type="button" class="cs-primary" id="csExport">Export Word — Complete report</button><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div>',
  '<p class="cs-mini">The original LineScale importer, calculations, and reports continue below this separate section.</p></div>'
  ].join("");
  hero.insertAdjacentElement("afterend",box);
@@ -265,8 +266,8 @@ var shadingPlugin={
  afterDatasetsDraw:function(chart){overlay(chart,"markers");}
 };
 function fitCrosbyView(t){
- var m=Math.max(project.minimum,t.peak)*1.17;
- return {xmin:0,xmax:Math.max(1,t.duration),ymin:0,ymax:Math.max(500,Math.ceil(m/500)*500)};
+ // Start each Crosby graph at 0–4,000 lb regardless of measured peak.
+ return {xmin:0,xmax:Math.max(1,t.duration),ymin:0,ymax:4000};
 }
 // Explicit Focus A–B uses the marker span plus context without moving markers.
 function focusCrosbyView(t){
@@ -376,6 +377,7 @@ function refreshCrosbyStats(t){
   "<span>Recorded hold ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+measured.hold.toFixed(1)+" s</strong></span>"+
   (t.style.showA&&t.style.showB?"<span>A–B markers: <strong>"+Number(span.toFixed(3))+" s</strong> ("+count+" measured points)</span>":"<span>A/B: not placed</span>")+
   (!valid?"<span class='cs-warning'>No qualifying "+project.hold+" s hold at "+project.minimum.toLocaleString()+" lb — review required</span>":"")+
+  (t.peak>crosbyView(t).ymax?"<span class='cs-warning'>Peak exceeds visible Y-axis ("+Math.round(t.peak).toLocaleString()+" lb). Adjust force view to inspect.</span>":"")+
   "<span>"+sampler+"</span>";
 }
 function draw(){
@@ -411,7 +413,7 @@ function refresh(){
  renderRows();
  if(selected())preview(S.current);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
- ["csWord","csPdf","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
+ ["csExport","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
  var autoBtn=document.querySelector('#csWorkflow [data-cs-view="autoscale"]');
  if(autoBtn)autoBtn.disabled=!S.tests.length;
 }
@@ -595,6 +597,9 @@ async function loadPreset(file){
   Object.keys(project).forEach(function(k){if(Object.prototype.hasOwnProperty.call(obj.project,k))project[k]=obj.project[k];});
   fieldMap.forEach(function(f){setControl("csField_"+f[0],project[f[0]]||"");});
   setControl("csTarget",project.minimum);setControl("csHold",project.hold);setControl("csPerPage",project.graphsPerPage);
+  setControl("csExportFormat",project.exportFormat==="pdf"?"pdf":"word");
+  setControl("csExportContent",project.exportContent==="graphs"?"graphs":"complete");
+  updateExportChoice();
   (obj.tests||[]).forEach(function(saved){
    var current=S.tests.find(function(t){return t.id===saved.id&&t.name===saved.name;})||S.tests.find(function(t){return t.id===saved.id;});
    if(!current)return;
@@ -613,10 +618,10 @@ async function loadPreset(file){
   refresh();status("Saved setup loaded. Import matching CSVs first to restore their individual mappings and styles.");
  }catch(e){status("Could not load setup: "+e.message,true);}
 }
-function imageDataUrl(buffer){
- var bytes=new Uint8Array(buffer),str="";
+function imageDataUrl(buffer,mime){
+ var bytes=buffer instanceof Uint8Array?buffer:new Uint8Array(buffer),str="";
  for(var i=0;i<bytes.length;i+=8192)str+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
- return "data:image/png;base64,"+btoa(str);
+ return "data:"+(mime||"image/png")+";base64,"+btoa(str);
 }
 async function graphPNG(t){
  if(typeof Chart==="undefined")throw Error("Chart.js is not available.");
@@ -642,39 +647,112 @@ async function loadLibrary(url,globalKey){
   document.head.appendChild(script);
  });
 }
-async function exportPDF(){
- var tests=ordered();if(!tests.length){status("Include at least one Crosby recording.",true);return;}
+
+function renderFullPDFIntro(doc,tests){
+ var L=40,W=532,bottom=730,y=37;
+ function footer(){
+  doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(91,100,109);
+  doc.text("The Adventure Guild | Inspection Documentation Report | Page "+doc.internal.getNumberOfPages(),L,763);
+ }
+ function next(){footer();doc.addPage();y=37;}
+ function room(h){if(y+h>bottom)next();}
+ function heading(name){
+  room(30);doc.setFillColor(217,222,226);doc.setDrawColor(94,104,114);doc.setLineWidth(.9);
+  doc.rect(L,y,W,23,"FD");doc.setTextColor(24,35,46);
+  doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text(String(name),L+9,y+15);y+=30;
+ }
+ function body(str){
+  doc.setFont("helvetica","normal");doc.setFontSize(9.5);doc.setTextColor(30,43,55);
+  var lines=doc.splitTextToSize(String(str==null?"":str),W-12);
+  lines.forEach(function(line){room(13);doc.text(line,L+5,y+9);y+=13;});y+=7;
+ }
+ function field(key,value){
+  var w1=153,w2=W-w1;doc.setFontSize(9);
+  var lines=doc.splitTextToSize(String(value==null?"":value),w2-13);
+  var h=Math.max(22,lines.length*12+8);room(h);
+  doc.setLineWidth(.8);doc.setDrawColor(95,107,117);doc.setFillColor(236,239,241);
+  doc.rect(L,y,w1,h,"FD");doc.rect(L+w1,y,w2,h,"S");
+  doc.setTextColor(27,42,53);doc.setFont("helvetica","bold");doc.text(key,L+7,y+14);
+  doc.setFont("helvetica","normal");
+  lines.forEach(function(line,i){doc.text(line,L+w1+7,y+14+i*12);});y+=h;
+ }
+ doc.setTextColor(21,34,44);doc.setFont("helvetica","bold");doc.setFontSize(17);
+ doc.text("The Adventure Guild",306,y+8,{align:"center"});y+=24;
+ doc.setFont("helvetica","normal");doc.setFontSize(8.5);
+ doc.text("P.O. Box 2621 | Dunlap, TN 37327 | (423) 266-5709 | www.theadventureguild.com",306,y+6,{align:"center"});y+=24;
+ doc.setFont("helvetica","bold");doc.setFontSize(18);
+ doc.text("Ground Anchor Testing",306,y+10,{align:"center"});y+=25;
+ field("Testing Date",project.date);field("Client",project.client);field("Location",project.location);
+ field("Project Manager",project.manager);field("Testing Performed By",project.tester);
+ field("Number of Anchors Tested",String(tests.length));y+=10;
+ heading("Testing Policy");body(project.policy);
+ heading("Disclaimer");body(project.disclaimer);
+ heading("Challenge Course Description");body(project.course);
+ heading("Description of Testing Procedure");body(project.procedure);
+ heading("Testing Ratings and Comments");
+ body("Pass: "+project.pass);body("Fail: "+project.fail);body("Not Inspected (NI): "+project.ni);
+ next();heading("Anchors");
+ body("Minimum "+project.minimum.toLocaleString()+" lb | Hold duration "+project.hold+" s | Measuring device "+project.model+" | Serial "+project.serial);
+ if(S.planImage){
+  var iw=Math.min(470,Math.round(210/Math.max(.01,S.planImage.ratio))),ih=iw*S.planImage.ratio;
+  room(ih+15);
+  var jpeg=S.planImage.type==="image/jpeg";
+  doc.addImage(imageDataUrl(S.planImage.bytes,S.planImage.type),jpeg?"JPEG":"PNG",L,y,iw,ih,undefined,"FAST");
+  y+=ih+14;
+ }
+ var widths=[215,92,153,72],headers=["Anchor # and Location","Applied Load","Measuring Device","Test ID"];
+ function tableRow(cells,header){
+  var lines=cells.map(function(t,i){return doc.splitTextToSize(String(t==null?"":t),widths[i]-12);});
+  var h=Math.max(24,Math.max.apply(null,lines.map(function(a){return a.length;}))*11+9);
+  room(h);var x=L;doc.setDrawColor(94,104,114);doc.setLineWidth(.8);
+  cells.forEach(function(val,i){
+   if(header){doc.setFillColor(217,222,226);doc.rect(x,y,widths[i],h,"FD");}
+   else doc.rect(x,y,widths[i],h,"S");
+   doc.setFont("helvetica",header?"bold":"normal");doc.setFontSize(header?9:8.5);
+   doc.setTextColor(28,42,54);
+   lines[i].forEach(function(line,j){doc.text(line,x+6,y+13+j*11);});x+=widths[i];
+  });y+=h;
+ }
+ tableRow(headers,true);
+ tests.forEach(function(t){tableRow([t.title||("Anchor "+t.anchor),Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id],false);});
+ footer();doc.addPage();
+}
+
+async function exportPDF(content){
+ var complete=content==="complete",tests=ordered();
+ if(!tests.length){status("Include at least one Crosby recording.",true);return;}
  try{
-  status("Preparing "+tests.length+" graphs for PDF…");
+  status("Preparing "+tests.length+" graphs for "+(complete?"complete report PDF":"graph-only PDF")+"…");
   await loadLibrary("https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js","jspdf");
-  var images=await graphImages(tests),PDF=window.jspdf.jsPDF,pdf=new PDF({unit:"pt",format:"letter",orientation:"portrait",compress:true});
-  var per=project.graphsPerPage===3?3:2;
-  var margin=34,width=612-margin*2;
+  var images=await graphImages(tests),PDF=window.jspdf.jsPDF;
+  var doc=new PDF({unit:"pt",format:"letter",orientation:"portrait",compress:true});
+  if(complete)renderFullPDFIntro(doc,tests);
+  var per=project.graphsPerPage===3?3:2,margin=34,width=612-margin*2;
   images.forEach(function(img,i){
-   var slot=i%per;
-   if(i&&slot===0)pdf.addPage();
-   var pageNum=Math.floor(i/per)+1;
+   var slot=i%per;if(i&&slot===0)doc.addPage();
+   var graphPage=Math.floor(i/per)+1;
    if(slot===0){
-    pdf.setFont("helvetica","bold");pdf.setFontSize(11);pdf.setTextColor(15,32,49);
-    pdf.text("Ground Anchor Testing - Graph Evidence",margin,35);
-    pdf.setFont("helvetica","normal");pdf.setFontSize(9);pdf.setTextColor(82,96,111);
-    pdf.text((project.client||"Project")+" | "+(project.date||""),margin,50);
-    pdf.setDrawColor(170,181,190);pdf.line(margin,57,612-margin,57);
+    doc.setFont("helvetica","bold");doc.setFontSize(11);doc.setTextColor(15,32,49);
+    doc.text("Ground Anchor Testing - Graph Evidence",margin,35);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(82,96,111);
+    doc.text((project.client||"Project")+" | "+(project.date||""),margin,50);
+    doc.setDrawColor(170,181,190);doc.line(margin,57,612-margin,57);
    }
-   var slotHeight=per===3?227:325,top=69+slot*slotHeight;
+   var top=69+slot*(per===3?227:325);
    var t=tests[i],stat=holdStats(t,project.minimum),anchor=t.title||("Anchor "+t.anchor);
-   pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.setTextColor(20,37,53);
-   pdf.text("Test "+(isMapped(t)?String(t.anchor):t.id)+" - "+anchor.slice(0,65),margin,top+12);
+   doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(20,37,53);
+   doc.text("Test "+(isMapped(t)?String(t.anchor):t.id)+" - "+anchor.slice(0,65),margin,top+12);
    var available=per===3?176:246;
-   pdf.addImage(img,"PNG",margin,top+20,width,available,"chart"+i,"FAST");
-   pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(76,87,98);
-   pdf.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s",margin,top+available+31);
-   if(t.comments)pdf.text(pdf.splitTextToSize(t.comments, width).slice(0,per===3?1:2),margin,top+available+43);
-   pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(100,106,115);
-   if(slot===0)pdf.text("The Adventure Guild | Inspection Documentation Report | Graph page "+pageNum,margin,765);
+   doc.addImage(img,"PNG",margin,top+20,width,available,"graph"+i,"FAST");
+   doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(76,87,98);
+   var clipped=t.peak>crosbyView(t).ymax?" | Peak exceeds Y-axis":"";
+   doc.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s"+clipped,margin,top+available+31);
+   if(t.comments)doc.text(doc.splitTextToSize(t.comments,width).slice(0,per===3?1:2),margin,top+available+43);
+   doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(100,106,115);
+   if(slot===0)doc.text("The Adventure Guild | Inspection Documentation Report | Graph page "+graphPage,margin,765);
   });
-  pdf.save(fileStem()+"_graphs.pdf");
-  status("Graph-only PDF exported: "+tests.length+" graphs, "+Math.ceil(tests.length/per)+" pages.");
+  doc.save(fileStem()+(complete?"_complete":"_graphs")+".pdf");
+  status((complete?"Complete report":"Graph-only")+" PDF exported with "+tests.length+" Crosby test graphs.");
  }catch(e){console.error(e);status("PDF export failed: "+e.message,true);}
 }
 function paragraph(docx,text,opts){
@@ -692,14 +770,16 @@ function dataBytes(url){
  var b=atob(url.split(",")[1]),out=new Uint8Array(b.length);
  for(var i=0;i<b.length;i++)out[i]=b.charCodeAt(i);return out;
 }
-async function exportWord(){
- var tests=ordered();if(!tests.length){status("Include at least one Crosby recording.",true);return;}
+async function exportWord(content){
+ var complete=content==="complete",tests=ordered();
+ if(!tests.length){status("Include at least one Crosby recording.",true);return;}
  try{
   status("Preparing "+tests.length+" graphs and editable report fields for Word…");
   await loadLibrary("https://unpkg.com/docx@9.5.1/dist/index.iife.js","docx");
   var d=window.docx,images=await graphImages(tests),ch=[];
   var head=function(title){return paragraph(d,title,{heading:d.HeadingLevel.HEADING_2,spacing:{before:170,after:80}});};
   var body=function(text){return paragraph(d,text,{spacing:{after:130}});};
+  if(complete){
   ch.push(paragraph(d,"The Adventure Guild",{heading:d.HeadingLevel.HEADING_1,alignment:d.AlignmentType.CENTER,spacing:{after:20}}));
   ch.push(paragraph(d,"P.O. Box 2621  ·  Dunlap, TN 37327  |  (423) 266-5709  |  www.theadventureguild.com",{alignment:d.AlignmentType.CENTER,spacing:{after:110}}));
   ch.push(paragraph(d,"Ground Anchor Testing",{heading:d.HeadingLevel.HEADING_1,alignment:d.AlignmentType.CENTER,spacing:{after:120}}));
@@ -721,13 +801,15 @@ async function exportWord(){
   ch.push(docxTable(d,[["Anchor # and Location","Applied Load","Measuring Device","Test ID"]].concat(tests.map(function(t){
    return [t.title||("Anchor "+t.anchor),Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id];
   }))));
+  }
   var per=project.graphsPerPage===3?3:2;
   tests.forEach(function(t,i){
    var stat=holdStats(t,project.minimum),img=images[i];
    ch.push(paragraph(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{
-    heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0,spacing:{before:100,after:45}
+    heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0&&(i>0||complete),spacing:{before:100,after:45}
    }));
-   ch.push(paragraph(d,"Log "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold >= "+project.minimum+" lb: "+stat.hold.toFixed(1)+" s",{
+   ch.push(paragraph(d,"Log "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold >= "+project.minimum+" lb: "+stat.hold.toFixed(1)+" s"+
+    (t.peak>crosbyView(t).ymax?" | Peak exceeds visible Y-axis":""),{
     spacing:{after:35}
    }));
    var w=490,h=per===3?159:184;
@@ -740,8 +822,8 @@ async function exportWord(){
    sections:[{properties:{page:{size:{width:12240,height:15840},margin:{top:670,bottom:650,left:760,right:760}}},footers:{default:footer},children:ch}]
   });
   var blob=await d.Packer.toBlob(document);
-  download(blob,fileStem()+"_complete.docx");
-  status("Complete editable Word report exported with "+tests.length+" Crosby test graphs.");
+  download(blob,fileStem()+(complete?"_complete":"_graphs")+".docx");
+  status((complete?"Complete editable Word report":"Graph-only Word document")+" exported with "+tests.length+" Crosby test graphs.");
  }catch(e){console.error(e);status("Word export failed: "+e.message,true);}
 }
 function example(){
@@ -753,6 +835,23 @@ function example(){
  var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
  S.tests.push(t);refresh();status("Illustrative example added. Remove it before producing an actual report.");
 }
+
+function updateExportChoice(){
+ var format=$("csExportFormat")?.value||"word",content=$("csExportContent")?.value||"complete";
+ var button=$("csExport");
+ if(button)button.textContent="Export "+(format==="pdf"?"PDF":"Word")+" — "+(content==="graphs"?"Graphs only":"Complete report");
+}
+async function exportSelected(){
+ var button=$("csExport");if(!button||button.disabled)return;
+ var format=$("csExportFormat").value,content=$("csExportContent").value;
+ if(!["word","pdf"].includes(format)||!["graphs","complete"].includes(content)){
+  status("Choose a valid format and content option.",true);return;
+ }
+ button.disabled=true;
+ try{if(format==="pdf")await exportPDF(content);else await exportWord(content);}
+ finally{button.disabled=!S.tests.length;}
+}
+
 function bind(){
  $("csImport").addEventListener("click",function(){$("csFiles").click();});
  $("csFiles").addEventListener("change",function(){importFiles(this.files);this.value="";});
@@ -798,8 +897,14 @@ function bind(){
  $("csHold").addEventListener("input",function(){project.hold=Math.max(0,numeric("csHold",10));criteriaChanged();});
  $("csPerPage").addEventListener("change",function(){project.graphsPerPage=Number(this.value)||2;});
  $("csPng").addEventListener("click",async function(){if(!selected())return;try{download(new Blob([dataBytes(await graphPNG(selected()))],{type:"image/png"}),safeName(selected().title)+"_graph.png");}catch(e){status("Graph PNG export failed: "+e.message,true);}});
- $("csWord").addEventListener("click",exportWord);
- $("csPdf").addEventListener("click",exportPDF);
+ ["csExportFormat","csExportContent"].forEach(function(id){
+  $(id).addEventListener("change",function(){
+   project.exportFormat=$("csExportFormat").value;
+   project.exportContent=$("csExportContent").value;
+   updateExportChoice();
+  });
+ });
+ $("csExport").addEventListener("click",exportSelected);
  $("csSavePreset").addEventListener("click",savePreset);
  $("csLoadPreset").addEventListener("click",function(){$("csPresetFile").click();});
  $("csPresetFile").addEventListener("change",function(){loadPreset(this.files?.[0]);this.value="";});
@@ -812,6 +917,9 @@ function bind(){
    $("csPlanName").textContent=f.name+" (included in Word report)";
   }catch(e){status("Could not load the site diagram: "+e.message,true);}
  });
+ setControl("csExportFormat",project.exportFormat);
+ setControl("csExportContent",project.exportContent);
+ updateExportChoice();
  dragBind();refresh();
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install);else install();
