@@ -1,0 +1,53 @@
+name: Verify Crosby Word export
+on:
+  push:
+    paths:
+      - 'crosby-report-v1.js'
+      - 'assets/tag-logo.base64'
+      - 'tests/word-export.integration.cjs'
+      - '.github/workflows/verify-word-export.yml'
+  workflow_dispatch:
+jobs:
+  verify-word:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact Word export library
+        run: npm install --no-save --package-lock=false docx@9.5.1
+      - name: Existing Crosby regression suite
+        run: node tests/crosby-graph.test.cjs
+      - name: Generate real DOCX using app exporter
+        run: node tests/word-export.integration.cjs /tmp/crosby-word.docx
+      - name: Verify DOCX relationships and XML
+        run: |
+          python3 - <<'PY'
+          import zipfile,xml.etree.ElementTree as ET
+          p='/tmp/crosby-word.docx'
+          with zipfile.ZipFile(p) as z:
+              assert z.testzip() is None
+              assert '[Content_Types].xml' in z.namelist()
+              assert 'word/document.xml' in z.namelist()
+              for name in z.namelist():
+                  if name.endswith('.xml') or name.endswith('.rels'):
+                      ET.fromstring(z.read(name))
+              doc=z.read('word/document.xml')
+              assert b'Ground Anchor Testing' in doc
+              assert b'3,000 lbs' in doc
+              assert b'www.theadventureguild.com' in doc
+              assert any(n.startswith('word/media/') for n in z.namelist())
+          print('DOCX ZIP, all embedded XML and relationships are well-formed.')
+          PY
+      - name: Verify Word processor can import document
+        run: |
+          if ! command -v libreoffice >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq libreoffice-writer
+          fi
+          mkdir -p /tmp/crosby-rendered
+          libreoffice -env:UserInstallation=file:///tmp/lo-crosby-ci --headless --convert-to pdf --outdir /tmp/crosby-rendered /tmp/crosby-word.docx
+          test -s /tmp/crosby-rendered/crosby-word.pdf
+          echo 'Word document opened and rendered successfully.'
