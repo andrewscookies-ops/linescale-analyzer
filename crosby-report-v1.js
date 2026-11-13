@@ -60,6 +60,28 @@ function parseClock(v){
  if(!m)return NaN;
  return Number(m[1])*3600+Number(m[2])*60+Number(m[3])+(m[4]?Number(m[4])/Math.pow(10,m[4].length):0);
 }
+// At 1 Hz, gaps >1.5 seconds cannot count as a continuous observed hold.
+function firstQualifyingHold(points,limit,seconds){
+ limit=Number(limit);seconds=Number(seconds);
+ if(!Array.isArray(points)||!points.length||!Number.isFinite(limit)||!Number.isFinite(seconds)||seconds<0)return null;
+ var start=-1,prev=null;
+ for(var i=0;i<points.length;i++){
+  var p=points[i];
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)){start=-1;prev=null;continue;}
+  if(p.y<limit){start=-1;prev=p;continue;}
+  if(start<0||!prev||p.x<=prev.x||p.x-prev.x>1.5)start=i;
+  if(p.x-points[start].x>=seconds-1e-7)return {a:points[start].x,b:points[start].x+seconds};
+  prev=p;
+ }
+ return null;
+}
+function placeAutomaticMarkers(t,force){
+ if(!t||t.markerManual&&!force)return false;
+ var q=firstQualifyingHold(t.points,project.minimum,project.hold);
+ if(q){t.style.a=q.a;t.style.b=q.b;t.style.showA=t.style.showB=true;}
+ else{t.style.a=0;t.style.b=Math.min(t.duration,Math.max(0,project.hold));t.style.showA=t.style.showB=false;}
+ t.markerManual=false;return !!q;
+}
 function parseCrosby(name,text){
  var rows=csvRows(text);
  var mi=rows.findIndex(function(r){return String(r[0]||"").toLowerCase()==="start shift"&&String(r[1]||"").toLowerCase()==="datalog type";});
@@ -84,14 +106,12 @@ function parseCrosby(name,text){
  points.sort(function(a,b){return a.x-b.x;});
  var rawId=String(m[0]||"").trim(),match=rawId.match(/^\d+/),num=match?Number(match[0]):null;
  var duration=points[points.length-1].x;
- var firstHigh=points.findIndex(function(p){return p.y>=project.minimum;});
- var lastHigh=-1;for(var z=points.length-1;z>=0;z--){if(points[z].y>=project.minimum){lastHigh=z;break;}}
- var a=firstHigh>=0?points[firstHigh].x:Math.max(0,duration*.25),b=lastHigh>=0?points[lastHigh].x:Math.max(a+1,duration*.75);
- var sty=template();sty.a=a;sty.b=b;
- return {name:name,id:rawId,device:device,date:rows[hi+1]?.[cols.date]||"",originalUnit:Object.keys(unitSet).join(", "),
-   points:points,duration:duration,peak:Math.max.apply(null,points.map(function(p){return p.y;})),
-   anchor:num&&num<=999?num:null,title:num?"Anchor "+num:"Unassigned anchor",
-   rating:"Pending review",comments:"",style:sty,enabled:true,view:null};
+ var t={name:name,id:rawId,device:device,date:rows[hi+1]?.[cols.date]||"",originalUnit:Object.keys(unitSet).join(", "),
+ points:points,duration:duration,peak:Math.max.apply(null,points.map(function(p){return p.y;})),
+ anchor:num&&num<=999?num:null,title:num?"Anchor "+num:"Unassigned anchor",
+ rating:"Pending review",comments:"",style:template(),enabled:true,view:null,markerManual:false};
+ placeAutomaticMarkers(t,true);
+ return t;
 }
 function holdStats(t,threshold){
  var data=t.points,steps=[];for(var i=1;i<data.length;i++)if(data[i].x>data[i-1].x)steps.push(data[i].x-data[i-1].x);
@@ -121,7 +141,7 @@ function install(){
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
- '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Set markers around load hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
+ '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Reset A/B to qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
  '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
  '<p class="cs-muted">The initial view shows the entire recording from 0 seconds. Choose Focus A–B or zoom in for individual second labels and measurement dots (typically 1 reading per second). Reset / Fit restores the full recording. Drag A / B freely between samples; their separation is never forced to 10 seconds. Snap A/B to seconds aligns each marker to its nearest recorded sample once, then dragging remains free.</p>',
@@ -161,8 +181,9 @@ function install(){
  status("Crosby mode ready. Import CSVs to generate graphs.");
 }
 function currentStyle(){return selected()?.style||template();}
-function currentStyleFromUI(){
+function currentStyleFromUI(e){
  var t=selected();if(!t)return;
+ if(e&&["csMarkerA","csMarkerB","csShowA","csShowB"].includes(e.target?.id))t.markerManual=true;
  var s=t.style;
  s.a=Math.max(0,Math.min(t.duration,numeric("csMarkerA",s.a)));
  s.b=Math.max(0,Math.min(t.duration,numeric("csMarkerB",s.b)));
@@ -312,13 +333,14 @@ function graphConfig(t,widthHint){
 }
 function refreshCrosbyStats(t){
  if(!t)return;
- var measured=holdStats(t,project.minimum),a=Number(t.style.a),b=Number(t.style.b);
+ var measured=holdStats(t,project.minimum),valid=firstQualifyingHold(t.points,project.minimum,project.hold),a=Number(t.style.a),b=Number(t.style.b);
  var span=Math.abs(b-a),lo=Math.min(a,b),hi=Math.max(a,b);
  var count=t.points.filter(function(p){return p.x>=lo-1e-5&&p.x<=hi+1e-5;}).length;
  var step=crosbySampleSeconds(t),sampler=step===null?"":(Math.abs(step-1)<.07?"1 Hz sampling":"Typical sample interval: "+step.toFixed(2)+" s");
  $("csStats").innerHTML="<span>Peak: <strong>"+Math.round(t.peak).toLocaleString()+" lb</strong></span>"+
   "<span>Recorded hold ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+measured.hold.toFixed(1)+" s</strong></span>"+
-  "<span>A–B markers: <strong>"+Number(span.toFixed(3))+" s</strong> ("+count+" measured points)</span>"+
+  (t.style.showA&&t.style.showB?"<span>A–B markers: <strong>"+Number(span.toFixed(3))+" s</strong> ("+count+" measured points)</span>":"<span>A/B: not placed</span>")+
+  (!valid?"<span class='cs-warning'>No qualifying "+project.hold+" s hold at "+project.minimum.toLocaleString()+" lb — review required</span>":"")+
   "<span>"+sampler+"</span><span>Rating: "+esc(t.rating)+" (manual)</span>";
 }
 function draw(){
@@ -377,13 +399,13 @@ async function importFiles(files){
 }
 function setWindow(){
  var t=selected();if(!t)return;
- var threshold=project.minimum,pts=t.points,first=pts.find(function(p){return p.y>=threshold;}),last=null;
- for(var i=pts.length-1;i>=0;i--)if(pts[i].y>=threshold){last=pts[i];break;}
- if(!first||!last){status("No samples cross the threshold in this recording.",true);return;}
- t.style.a=first.x;t.style.b=last.x;t.style.showA=true;t.style.showB=true;t.view=null;loadStyle();draw();
+ var found=placeAutomaticMarkers(t,true);
+ t.view=null;loadStyle();draw();
+ status(found?"A/B reset to first qualifying "+project.hold+" s hold.":"No continuous "+project.hold+" s hold above "+project.minimum+" lb. Markers hidden for review.",!found);
 }
 function snapCrosbyMarkers(){
  var t=selected();if(!t||!t.points.length)return;
+ t.markerManual=true;
  ["a","b"].forEach(function(key){
   var value=Number(t.style[key]);if(!Number.isFinite(value))return;
   // Use actual recorded timestamps, including gaps; equal distances choose earlier.
@@ -397,13 +419,17 @@ function snapCrosbyMarkers(){
  loadStyle();draw();
 }
 function copyStyle(){
- var t=selected();if(!t)return;
- S.tests.forEach(function(x){
-  if(x===t)return;
-  var spanRatioA=t.duration?t.style.a/t.duration:0,spanRatioB=t.duration?t.style.b/t.duration:1;
-  x.style=Object.assign({},t.style,{a:+(spanRatioA*x.duration).toFixed(1),b:+(spanRatioB*x.duration).toFixed(1)});
+ var src=selected();if(!src)return;
+ // Only styling; never copy marker coordinates, visibility, zoom or ratings.
+ var keys=["band","bandColor","bandAlpha","above","aboveColor","aboveAlpha","aboveScope","below","belowColor","belowAlpha","belowScope"];
+ var n=0,review=0;
+ S.tests.forEach(function(t){
+  if(t===src)return;
+  if(!t.markerManual&&!placeAutomaticMarkers(t,false))review++;
+  keys.forEach(function(k){t.style[k]=src.style[k];});n++;
  });
- status("Copied colors, fill modes, opacity, and relative marker positions to every Crosby graph.");
+ status("Copied shading to "+n+" graph"+(n===1?"":"s")+". Each graph keeps its own A/B positions; manual adjustments preserved."+
+ (review?" "+review+" test"+(review===1?" needs":"s need")+" hold review.":""));
 }
 function clearStyle(){
  var t=selected();if(!t)return;
@@ -489,7 +515,7 @@ function dragBind(){
   var g=S.gesture;
   if(g?.type==="marker"&&S.pointers.size===1){
    var x=ch.scales.x.getValueForPixel(p.x);
-   if(Number.isFinite(x)){t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
+   if(Number.isFinite(x)){t.markerManual=true;t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
   }else panOrPinch();
   e.preventDefault();
  });
@@ -510,7 +536,7 @@ function dragBind(){
 }
 
 function reportData(){
- return {project:Object.assign({},project),tests:S.tests.map(function(t){return {id:t.id,name:t.name,anchor:t.anchor,title:t.title,rating:t.rating,comments:t.comments,style:t.style,enabled:t.enabled};})};
+ return {project:Object.assign({},project),tests:S.tests.map(function(t){return {id:t.id,name:t.name,anchor:t.anchor,title:t.title,rating:t.rating,comments:t.comments,style:t.style,enabled:t.enabled,markerManual:!!t.markerManual};})};
 }
 function download(blob,name){
  var url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},10000);
@@ -531,7 +557,12 @@ async function loadPreset(file){
    var current=S.tests.find(function(t){return t.id===saved.id&&t.name===saved.name;})||S.tests.find(function(t){return t.id===saved.id;});
    if(!current)return;
    ["anchor","title","rating","comments","enabled"].forEach(function(k){if(k in saved)current[k]=saved[k];});
-   if(saved.style)current.style=Object.assign(template(),saved.style);
+   if(saved.style){
+    current.style=Object.assign(template(),saved.style);
+    // Old setup formats predate markerManual: preserve their saved positions.
+    current.markerManual=typeof saved.markerManual==="boolean"?saved.markerManual:true;
+    if(!current.markerManual)placeAutomaticMarkers(current,true);
+   }
   });
   refresh();status("Saved setup loaded. Import matching CSVs first to restore their individual mappings and styles.");
  }catch(e){status("Could not load setup: "+e.message,true);}
@@ -712,8 +743,12 @@ function bind(){
   $(id).addEventListener("input",currentStyleFromUI);$(id).addEventListener("change",currentStyleFromUI);
  });
  $("csComments").addEventListener("input",function(){var t=selected();if(t)t.comments=this.value;});
- $("csTarget").addEventListener("input",function(){project.minimum=Math.max(0,numeric("csTarget",3000));renderRows();draw();});
- $("csHold").addEventListener("input",function(){project.hold=Math.max(0,numeric("csHold",10));});
+ function criteriaChanged(){
+  S.tests.forEach(function(t){placeAutomaticMarkers(t,false);});
+  if(selected())loadStyle();renderRows();draw();
+ }
+ $("csTarget").addEventListener("input",function(){project.minimum=Math.max(0,numeric("csTarget",3000));criteriaChanged();});
+ $("csHold").addEventListener("input",function(){project.hold=Math.max(0,numeric("csHold",10));criteriaChanged();});
  $("csPerPage").addEventListener("change",function(){project.graphsPerPage=Number(this.value)||2;});
  $("csPng").addEventListener("click",async function(){if(!selected())return;try{download(new Blob([dataBytes(await graphPNG(selected()))],{type:"image/png"}),safeName(selected().title)+"_graph.png");}catch(e){status("Graph PNG export failed: "+e.message,true);}});
  $("csWord").addEventListener("click",exportWord);
