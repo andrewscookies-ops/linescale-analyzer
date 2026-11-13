@@ -77,7 +77,8 @@ function load() {
   const expose = `globalThis.__crosby = {
     S, project, template, install, parseCrosby, crosbyView, graphConfig,
     refreshCrosbyStats, crosbyAction, refresh, importFiles, reportData,
-    snapCrosbyMarkers: typeof snapCrosbyMarkers === 'function' ? snapCrosbyMarkers : undefined
+    snapCrosbyMarkers: typeof snapCrosbyMarkers === 'function' ? snapCrosbyMarkers : undefined,
+    appliedLoadLabel, wordAnchorRows
   };\n`;
   assert.match(source, /\}\)\(\);\s*$/, 'Expected the module IIFE closing boundary');
   const context = vm.createContext({ document, Chart, console });
@@ -181,6 +182,38 @@ test('Auto Scale restores 0–4,000 lb while centering time around A/B markers',
   const previousView = plain(t.view);
   h.crosbyAction('autoscale');
   assert.deepEqual(plain(t.view), previousView);
+});
+
+test('anchor table applied load uses configured minimum, never graph peaks', () => {
+  const h=load();
+  const first=recording(h,{title:"Anchor 1",peak:3795,rating:"Pending review"});
+  const second=recording(h,{title:"Anchor 2",peak:5168,rating:"Pass",id:"2"});
+  const rows3000=plain(h.wordAnchorRows([first,second]));
+  assert.deepEqual(rows3000[0],["Anchor # and Location","Rating","Applied Load","Measuring Device","Sheet#"]);
+  assert.equal(h.appliedLoadLabel(),">3,000 lbs");
+  assert.deepEqual(rows3000.slice(1).map(row=>row[2]),[">3,000 lbs",">3,000 lbs"]);
+  assert.equal(rows3000[1][1],"Pending review");
+  assert.equal(rows3000[2][1],"Pass");
+  assert.match(rows3000[1][3],/Crosby Straightpoint Tensionmeter/);
+  h.project.minimum=4250;
+  assert.equal(h.appliedLoadLabel(),">4,250 lbs");
+  assert.deepEqual(plain(h.wordAnchorRows([first,second])).slice(1).map(row=>row[2]),[">4,250 lbs",">4,250 lbs"]);
+  assert.equal(first.peak,3795);
+  assert.equal(second.peak,5168);
+});
+
+test('Word layout preserves original TAG branding, black text, gray bars and hyperlink', () => {
+  const source=fs.readFileSync(sourcePath,'utf8');
+  assert.match(source,/tagBrandedHeader\(d,logo\)/);
+  assert.match(source,/tagLogoBytes\(\)/);
+  assert.match(source,/ExternalHyperlink/);
+  assert.match(source,/https:\/\/www\.theadventureguild\.com/);
+  assert.match(source,/fill:"BFBFBF"/);
+  assert.match(source,/font:"Calibri",size:48,bold:true/);
+  assert.match(source,/font:"Calibri",size:22/);
+  assert.match(source,/size:20,color:"000000"/);
+  assert.match(source,/Inspection Documentation Report/);
+  assert.match(source,/tagTable\(d,wordAnchorRows\(tests\)/);
 });
 
 test('A–B statistics show 0.02 and 0.001 seconds rather than rounding them away', () => {
