@@ -293,8 +293,7 @@ function autoScaleCrosbyView(t){
  var start=Math.max(0,lo-10);
  if(Number.isFinite(t.duration)&&t.duration>=width&&start+width>t.duration)
   start=Math.max(0,t.duration-width);
- var v=crosbyView(t);
- return {xmin:start,xmax:start+width,ymin:v.ymin,ymax:v.ymax};
+ return {xmin:start,xmax:start+width,ymin:0,ymax:4000};
 }
 function validateCrosbyAxisRange(start,end){
  var lo=Number(start),hi=Number(end);
