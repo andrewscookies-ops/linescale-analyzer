@@ -139,7 +139,7 @@ function install(){
  '<p class="cs-intro">Import the original Crosby reports, review the test-to-anchor mapping, annotate force-time graphs, and export a fully editable Word report or graph-only PDF pages for an existing report. All processing stays in this browser.</p>',
  '<div class="cs-toolbar"><button type="button" class="cs-primary" id="csImport">＋ Import up to 50 Crosby CSVs</button><input id="csFiles" type="file" accept=".csv,text/csv" multiple hidden><span class="cs-muted" id="csCount">0 / 50 loaded</span><button type="button" id="csDemo">Load a small example</button><button type="button" id="csReset">Clear imports</button></div>',
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
- '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
+ '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and select which recordings to include. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
  '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Reset A/B to qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
  '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="autoscale" title="10 seconds before A, 10 seconds after B">Auto Scale</button><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
@@ -164,7 +164,7 @@ function install(){
  '<div class="cs-panel"><h3>4 · Export reports</h3>',
  '<div class="cs-report-controls"><label>Minimum test load (lb)<input id="csTarget" type="number" min="0" step="10" value="3000"></label><label>Specified hold duration (seconds)<input id="csHold" type="number" min="0" step="1" value="10"></label>',
  '<label>Graphs per page<select id="csPerPage"><option value="2" selected>2 · larger graphs</option><option value="3">3 · compact graphs</option></select></label></div>',
- '<p class="cs-muted">The minimum line is a reference, not an automatic compliance rating. Ratings remain manual. The graph-only PDF contains no cover pages, so you can insert it after page 2 of an existing Word report.</p>',
+ '<p class="cs-muted">The minimum line is a visual reference, not a certification decision. Use Include to select which recordings appear in the exports. The graph-only PDF contains no cover pages, so you can insert it after page 2 of an existing Word report.</p>',
  '<div class="cs-export"><button type="button" class="cs-primary" id="csWord">Download complete editable Word report (.docx)</button><button type="button" class="cs-primary" id="csPdf">Download graph-only PDF</button><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div>',
  '<p class="cs-mini">The original LineScale importer, calculations, and reports continue below this separate section.</p></div>'
  ].join("");
@@ -376,7 +376,7 @@ function refreshCrosbyStats(t){
   "<span>Recorded hold ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+measured.hold.toFixed(1)+" s</strong></span>"+
   (t.style.showA&&t.style.showB?"<span>A–B markers: <strong>"+Number(span.toFixed(3))+" s</strong> ("+count+" measured points)</span>":"<span>A/B: not placed</span>")+
   (!valid?"<span class='cs-warning'>No qualifying "+project.hold+" s hold at "+project.minimum.toLocaleString()+" lb — review required</span>":"")+
-  "<span>"+sampler+"</span><span>Rating: "+esc(t.rating)+" (manual)</span>";
+  "<span>"+sampler+"</span>";
 }
 function draw(){
  var t=selected(),canvas=$("csCanvas");if(!canvas)return;
@@ -391,12 +391,11 @@ function renderRows(){
  var host=$("csRows");if(!host)return;
  host.innerHTML=S.tests.map(function(t,i){
   var m=holdStats(t,project.minimum);
-  var options=["Pending review","Pass","Fail","Not Inspected"].map(function(s){return '<option value="'+esc(s)+'"'+(t.rating===s?' selected':'')+'>'+esc(s)+'</option>';}).join("");
   return '<tr data-index="'+i+'" class="'+(i===S.current?"cs-selected":"")+'"><td><button type="button" data-open="'+i+'">View</button></td>'
    +'<td><strong class="cs-id">'+esc(t.id)+'</strong><br><span class="cs-mini">'+esc(t.name)+'</span></td>'
    +'<td><input type="number" min="1" max="999" data-prop="anchor" value="'+(isMapped(t)?esc(t.anchor):"")+'" placeholder="Assign" style="max-width:80px"></td>'
    +'<td><input type="text" data-prop="title" value="'+esc(t.title)+'"></td>'
-   +'<td><select data-prop="rating">'+options+'</select></td><td>'+Math.round(t.peak).toLocaleString()+'</td><td>'+m.hold.toFixed(1)+' s</td>'
+   +'<td>'+Math.round(t.peak).toLocaleString()+'</td><td>'+m.hold.toFixed(1)+' s</td>'
    +'<td><input type="checkbox" data-prop="enabled" '+(t.enabled?"checked":"")+' aria-label="Include '+esc(t.name)+'"></td></tr>';
  }).join("");
  $("csCount").textContent=S.tests.length+" / 50 loaded · "+ordered().length+" included";
@@ -669,7 +668,7 @@ async function exportPDF(){
    var available=per===3?176:246;
    pdf.addImage(img,"PNG",margin,top+20,width,available,"chart"+i,"FAST");
    pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(76,87,98);
-   pdf.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s | Rating "+t.rating,margin,top+available+31);
+   pdf.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s",margin,top+available+31);
    if(t.comments)pdf.text(pdf.splitTextToSize(t.comments, width).slice(0,per===3?1:2),margin,top+available+43);
    pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(100,106,115);
    if(slot===0)pdf.text("The Adventure Guild | Inspection Documentation Report | Graph page "+pageNum,margin,765);
@@ -719,8 +718,8 @@ async function exportWord(){
   if(S.planImage){
    var planWidth=Math.min(470,Math.round(235/Math.max(.01,S.planImage.ratio)));ch.push(new d.Paragraph({children:[new d.ImageRun({type:S.planImage.type==="image/png"?"png":"jpg",data:S.planImage.bytes,transformation:{width:planWidth,height:Math.round(planWidth*S.planImage.ratio)}})],spacing:{after:100}}));
   }
-  ch.push(docxTable(d,[["Anchor # and Location","Rating","Applied Load","Measuring Device","Test ID"]].concat(tests.map(function(t){
-   return [t.title||("Anchor "+t.anchor),t.rating,Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id];
+  ch.push(docxTable(d,[["Anchor # and Location","Applied Load","Measuring Device","Test ID"]].concat(tests.map(function(t){
+   return [t.title||("Anchor "+t.anchor),Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id];
   }))));
   var per=project.graphsPerPage===3?3:2;
   tests.forEach(function(t,i){
@@ -728,7 +727,7 @@ async function exportWord(){
    ch.push(paragraph(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{
     heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0,spacing:{before:100,after:45}
    }));
-   ch.push(paragraph(d,"Log "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold >= "+project.minimum+" lb: "+stat.hold.toFixed(1)+" s | Rating: "+t.rating,{
+   ch.push(paragraph(d,"Log "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold >= "+project.minimum+" lb: "+stat.hold.toFixed(1)+" s",{
     spacing:{after:35}
    }));
    var w=490,h=per===3?159:184;
