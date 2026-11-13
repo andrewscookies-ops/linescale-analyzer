@@ -122,9 +122,9 @@ function install(){
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
  '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Set markers around load hold</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
- '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
+ '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted">Scroll / pinch to zoom, drag to pan, or double-click to fit. Drag A / B markers or enter their times below. Markers initially bracket the detected hold and each graph remembers its own view and shading.</p>',
+ '<p class="cs-muted">The initial view focuses on A–B with a few seconds of context. Each dot is a recorded sample (typically 1 reading per second). Zoom in for individual second labels, or choose Reset / Fit for the entire recording. Drag A / B to fine-tune; actual observed times are never forced to 10 seconds.</p>',
  '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step=".1" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
  '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step=".1" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
  '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
@@ -245,27 +245,82 @@ function fitCrosbyView(t){
  var m=Math.max(project.minimum,t.peak)*1.17;
  return {xmin:0,xmax:Math.max(1,t.duration),ymin:0,ymax:Math.max(500,Math.ceil(m/500)*500)};
 }
-function crosbyView(t){return t.view?Object.assign({},t.view):fitCrosbyView(t);}
-function graphConfig(t){
+// The automatic opening view uses the measured A–B span plus surrounding seconds.
+// It never alters the measurements or the marker values.
+function focusCrosbyView(t){
+ var full=fitCrosbyView(t),a=Number(t.style?.a),b=Number(t.style?.b);
+ if(!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(b-a)<.5)return full;
+ var lo=Math.min(a,b),hi=Math.max(a,b),hold=hi-lo;
+ var padding=Math.max(3,Math.min(6,hold*.4));
+ var width=Math.min(Math.max(1,t.duration),Math.max(16,hold+2*padding));
+ if(!Number.isFinite(width)||width>=t.duration)return full;
+ var middle=(lo+hi)/2;
+ var left=Math.max(0,Math.min(t.duration-width,middle-width/2));
+ return {xmin:+left.toFixed(3),xmax:+(left+width).toFixed(3),ymin:full.ymin,ymax:full.ymax};
+}
+function crosbyView(t){return t.view?Object.assign({},t.view):focusCrosbyView(t);}
+function crosbyTickStep(viewSpan,chartWidth){
+ var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
+ var steps=[.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
+ for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-7)return steps[i];
+ return Math.ceil(desired/1200)*1200;
+}
+function crosbySampleSeconds(t){
+ var steps=[];
+ for(var i=1;i<t.points.length;i++){
+  var d=t.points[i].x-t.points[i-1].x;
+  if(d>0&&Number.isFinite(d))steps.push(d);
+ }
+ if(!steps.length)return null;
+ steps.sort(function(a,b){return a-b;});
+ return steps[Math.floor(steps.length/2)];
+}
+function graphConfig(t,widthHint){
  var threshold=Math.max(0,project.minimum),max=Math.max(threshold,t.peak)*1.17,v=crosbyView(t);
+ var width=widthHint||$("csCanvas")?.getBoundingClientRect()?.width||720;
+ var step=crosbyTickStep(v.xmax-v.xmin,width);
  return {
   type:"line",
   data:{datasets:[
-   {label:"Load (lb)",data:t.points,parsing:false,borderColor:"#13559f",borderWidth:2.5,backgroundColor:"#13559f",pointRadius:0,pointHitRadius:7,tension:0,order:1},
+   {label:"Load (lb)",data:t.points,parsing:false,borderColor:"#13559f",borderWidth:2.5,
+    backgroundColor:"#13559f",pointBackgroundColor:"#13559f",pointBorderColor:"#ffffff",pointBorderWidth:.6,
+    pointRadius:function(ctx){var x=ctx.chart.scales.x;var span=x?x.max-x.min:v.xmax-v.xmin;return span<=32?3:span<=55?1.6:0;},
+    pointHoverRadius:5,pointHitRadius:9,tension:0,order:1},
    {label:"Minimum "+threshold.toLocaleString()+" lb",data:[{x:0,y:threshold},{x:t.duration,y:threshold}],parsing:false,
     borderColor:"#dd5238",borderWidth:1.6,borderDash:[7,5],pointRadius:0,order:2}
   ]},
   plugins:[shadingPlugin],
   options:{
    responsive:true,maintainAspectRatio:false,animation:false,devicePixelRatio:1,
+   onResize:function(chart,size){
+    var x=chart.scales?.x;if(!x)return;
+    chart.options.scales.x.ticks.stepSize=crosbyTickStep(x.max-x.min,size.width);
+   },
    parsing:false,normalized:true,
-   plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{label:function(ctx){return ctx.datasetIndex===0?"Load: "+Math.round(ctx.parsed.y).toLocaleString()+" lb":"Minimum load";}}}},
+   plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{
+    title:function(items){return items.length?"Time: "+Number(items[0].parsed.x).toFixed(2).replace(/\\.00$/,"")+" s":"";},
+    label:function(ctx){return ctx.datasetIndex===0?"Measured force: "+Math.round(ctx.parsed.y).toLocaleString()+" lb":"Minimum load";}
+   }}},
    scales:{
-    x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},ticks:{color:"#526479",maxTicksLimit:10},grid:{color:"#e4e8ec"}},
+    x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},
+      ticks:{color:"#526479",stepSize:step,autoSkip:false,maxRotation:0,
+       callback:function(value){return Number(value).toLocaleString(undefined,{maximumFractionDigits:2});}},
+      grid:{color:"#e4e8ec"}},
     y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",callback:function(v){return Number(v).toLocaleString();}},grid:{color:"#dfe5e9"}}
    }
   }
  };
+}
+function refreshCrosbyStats(t){
+ if(!t)return;
+ var measured=holdStats(t,project.minimum),a=Number(t.style.a),b=Number(t.style.b);
+ var span=Math.abs(b-a),lo=Math.min(a,b),hi=Math.max(a,b);
+ var count=t.points.filter(function(p){return p.x>=lo-1e-5&&p.x<=hi+1e-5;}).length;
+ var step=crosbySampleSeconds(t),sampler=step===null?"":(Math.abs(step-1)<.07?"1 Hz sampling":"Typical sample interval: "+step.toFixed(2)+" s");
+ $("csStats").innerHTML="<span>Peak: <strong>"+Math.round(t.peak).toLocaleString()+" lb</strong></span>"+
+  "<span>Recorded hold ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+measured.hold.toFixed(1)+" s</strong></span>"+
+  "<span>A–B markers: <strong>"+span.toFixed(1)+" s</strong> ("+count+" measured points)</span>"+
+  "<span>"+sampler+"</span><span>Rating: "+esc(t.rating)+" (manual)</span>";
 }
 function draw(){
  var t=selected(),canvas=$("csCanvas");if(!canvas)return;
@@ -273,8 +328,7 @@ function draw(){
  if(!t){$("csGraphHeading").textContent="2 · Graph editor — import data to begin";$("csStats").textContent="";return;}
  if(typeof Chart==="undefined"){status("Chart.js is unavailable. Check network access.",true);return;}
  $("csGraphHeading").textContent="2 · "+(t.title||"Anchor") + " — Crosby log "+t.id;
- var m=holdStats(t,project.minimum);
- $("csStats").innerHTML="<span>Peak: <strong>"+Math.round(t.peak).toLocaleString()+" lb</strong></span><span>Recording: "+duration(t)+" s</span><span>Longest observed ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+m.hold.toFixed(1)+" s</strong></span><span>Rating: "+esc(t.rating)+" (manual)</span>";
+ refreshCrosbyStats(t);
  S.chart=new Chart(canvas,graphConfig(t));S.chart.$crosby=t;S.chart.update("none");
 }
 function renderRows(){
@@ -325,7 +379,7 @@ function setWindow(){
  var threshold=project.minimum,pts=t.points,first=pts.find(function(p){return p.y>=threshold;}),last=null;
  for(var i=pts.length-1;i>=0;i--)if(pts[i].y>=threshold){last=pts[i];break;}
  if(!first||!last){status("No samples cross the threshold in this recording.",true);return;}
- t.style.a=first.x;t.style.b=last.x;t.style.showA=true;t.style.showB=true;loadStyle();draw();
+ t.style.a=first.x;t.style.b=last.x;t.style.showA=true;t.style.showB=true;t.view=null;loadStyle();draw();
 }
 function copyStyle(){
  var t=selected();if(!t)return;
@@ -364,11 +418,13 @@ function setCrosbyView(v){
  var t=selected(),ch=S.chart;if(!t||!ch)return;
  t.view=v;
  ch.options.scales.x.min=v.xmin;ch.options.scales.x.max=v.xmax;
+ ch.options.scales.x.ticks.stepSize=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
  ch.options.scales.y.min=v.ymin;ch.options.scales.y.max=v.ymax;ch.update("none");
 }
 function crosbyAction(action){
  var t=selected();if(!t||!S.chart)return;
  if(action==="reset"){setCrosbyView(fitCrosbyView(t));return;}
+ if(action==="focus"){setCrosbyView(focusCrosbyView(t));return;}
  var v=crosbyView(t);
  if(action==="in"||action==="out"){setCrosbyView(crosbyZoom(v,action==="in"?.8:1.25,.5,.5));return;}
  setCrosbyView(crosbyPan(v,action==="left"?.15:action==="right"?-.15:0,action==="up"?.15:action==="down"?-.15:0));
@@ -418,7 +474,7 @@ function dragBind(){
   var g=S.gesture;
   if(g?.type==="marker"&&S.pointers.size===1){
    var x=ch.scales.x.getValueForPixel(p.x);
-   if(Number.isFinite(x)){t.style[g.key]=Math.max(0,Math.min(t.duration,Math.round(x*100)/100));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");}
+   if(Number.isFinite(x)){t.style[g.key]=Math.max(0,Math.min(t.duration,Math.round(x*100)/100));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
   }else panOrPinch();
   e.preventDefault();
  });
@@ -474,7 +530,7 @@ async function graphPNG(t){
  if(typeof Chart==="undefined")throw Error("Chart.js is not available.");
  var c=document.createElement("canvas");c.width=1200;c.height=455;
  c.style.width="1200px";c.style.height="455px";
- var cfg=graphConfig(t);cfg.options.responsive=false;var ch=new Chart(c,cfg);ch.$crosby=t;ch.update("none");
+ var cfg=graphConfig(t,1200);cfg.options.responsive=false;var ch=new Chart(c,cfg);ch.$crosby=t;ch.update("none");
  var png=c.toDataURL("image/png");ch.destroy();return png;
 }
 async function graphImages(tests){
