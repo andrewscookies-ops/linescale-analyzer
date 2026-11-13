@@ -740,15 +740,22 @@ async function exportPDF(content){
     doc.setDrawColor(170,181,190);doc.line(margin,57,612-margin,57);
    }
    var top=69+slot*(per===3?227:325);
-   var t=tests[i],stat=holdStats(t,project.minimum),anchor=t.title||("Anchor "+t.anchor);
+   var t=tests[i],anchor=t.title||("Anchor "+t.anchor);
    doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(20,37,53);
    doc.text("Test "+(isMapped(t)?String(t.anchor):t.id)+" - "+anchor.slice(0,65),margin,top+12);
    var available=per===3?176:246;
    doc.addImage(img,"PNG",margin,top+20,width,available,"graph"+i,"FAST");
-   doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(76,87,98);
-   var clipped=t.peak>crosbyView(t).ymax?" | Peak exceeds Y-axis":"";
-   doc.text("Crosby "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold "+stat.hold.toFixed(1)+" s"+clipped,margin,top+available+31);
-   if(t.comments)doc.text(doc.splitTextToSize(t.comments,width).slice(0,per===3?1:2),margin,top+available+43);
+   // Keep all per-test measurements and editing labels in the application,
+   // not in exported graph captions. Warn only for an off-scale trace.
+   var offscale=t.peak>crosbyView(t).ymax;
+   if(offscale){
+    doc.setFont("helvetica","italic");doc.setFontSize(8);doc.setTextColor(110,65,30);
+    doc.text("Peak exceeds displayed Y-axis; inspect original recorded readings.",margin,top+available+31);
+   }
+   if(t.comments){
+    doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(76,87,98);
+    doc.text(doc.splitTextToSize(t.comments,width).slice(0,per===3?1:2),margin,top+available+(offscale?43:31));
+   }
    doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(100,106,115);
    if(slot===0)doc.text("The Adventure Guild | Inspection Documentation Report | Graph page "+graphPage,margin,765);
   });
@@ -805,16 +812,15 @@ async function exportWord(content){
   }
   var per=project.graphsPerPage===3?3:2;
   tests.forEach(function(t,i){
-   var stat=holdStats(t,project.minimum),img=images[i];
+   var img=images[i];
    ch.push(paragraph(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{
     heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0&&(i>0||complete),spacing:{before:100,after:45}
    }));
-   ch.push(paragraph(d,"Log "+t.id+" | Peak "+Math.round(t.peak).toLocaleString()+" lb | Observed hold >= "+project.minimum+" lb: "+stat.hold.toFixed(1)+" s"+
-    (t.peak>crosbyView(t).ymax?" | Peak exceeds visible Y-axis":""),{
-    spacing:{after:35}
-   }));
+   // Graph starts directly after its title; no metadata paragraph between them.
    var w=490,h=per===3?159:184;
    ch.push(new d.Paragraph({children:[new d.ImageRun({type:"png",data:dataBytes(img),transformation:{width:w,height:h}})],spacing:{after:70}}));
+   if(t.peak>crosbyView(t).ymax)
+    ch.push(paragraph(d,"Peak exceeds displayed Y-axis; inspect original recorded readings.",{spacing:{after:45}}));
    if(t.comments)ch.push(paragraph(d,"Comments: "+t.comments,{spacing:{after:65}}));
   });
   var footer=new d.Footer({children:[paragraph(d,"The Adventure Guild  |  Inspection Documentation Report",{alignment:d.AlignmentType.CENTER})]});
