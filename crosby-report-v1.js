@@ -298,7 +298,7 @@ function graphConfig(t,widthHint){
    },
    parsing:false,normalized:true,
    plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{
-    title:function(items){return items.length?"Time: "+Number(items[0].parsed.x).toFixed(2).replace(/\\.00$/,"")+" s":"";},
+    title:function(items){return items.length?"Time: "+Number(items[0].parsed.x).toFixed(2).replace(/\.00$/,"")+" s":"";},
     label:function(ctx){return ctx.datasetIndex===0?"Measured force: "+Math.round(ctx.parsed.y).toLocaleString()+" lb":"Minimum load";}
    }}},
    scales:{
