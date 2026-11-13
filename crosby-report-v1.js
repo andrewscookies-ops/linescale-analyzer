@@ -805,7 +805,7 @@ function tagTable(d,rows,widths,options){
    var text=[];
    parts.forEach(function(part,j){
     if(j)text.push(new d.TextRun({break:1}));
-    text.push(tagRun(d,part,{size:o.fontSize||20,bold:isHeading&&o.boldHeading===true}));
+    text.push(tagRun(d,part,{size:isHeading?(o.headingFontSize||o.fontSize||20):(o.fontSize||20),bold:isHeading&&o.boldHeading===true}));
    });
    return new d.TableCell({
     width:{size:widths[i],type:d.WidthType.DXA},
@@ -824,7 +824,7 @@ function tagBar(d,label,center){
  return tagTable(d,[[label]],[9360],{headingRows:1,boldHeading:true,centerHeading:!!center,fontSize:22});
 }
 function tagSectionBox(d,label,value){
- return tagTable(d,[[label],[String(value||"")]],[9360],{headingRows:1,boldHeading:true,fontSize:20});
+ return tagTable(d,[[label],[String(value||"")]],[9360],{headingRows:1,boldHeading:true,headingFontSize:22,fontSize:20});
 }
 function tagField(d,label,value){
  return tagP(d,[tagRun(d,label,{bold:true,size:20}),tagRun(d,"  "+String(value==null?"":value),{size:20})],{spacing:{after:0}});
@@ -918,9 +918,8 @@ async function exportWord(content){
   var per=project.graphsPerPage===3?3:2;
   tests.forEach(function(t,i){
    var img=images[i];
-   ch.push(paragraph(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{
-    heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0&&(i>0||complete),
-    spacing:{before:100,after:45}
+   ch.push(tagP(d,[tagRun(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{font:"Arial",size:22,bold:true})],{
+    pageBreakBefore:i%per===0&&(i>0||complete),spacing:{before:100,after:45}
    }));
    var w=490,h=per===3?159:184;
    ch.push(new d.Paragraph({children:[new d.ImageRun({type:"png",data:dataBytes(img),transformation:{width:w,height:h}})],spacing:{after:70}}));
