@@ -583,7 +583,11 @@ function reportData(){
  return {project:Object.assign({},project),tests:S.tests.map(function(t){return {id:t.id,name:t.name,anchor:t.anchor,title:t.title,rating:t.rating,comments:t.comments,style:t.style,enabled:t.enabled,markerManual:!!t.markerManual,view:t.view?Object.assign({},t.view):null};})};
 }
 function download(blob,name){
- var url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},10000);
+ // Large Word reports can contain up to 50 detailed graph images. Give the
+ // browser sufficient time to finish saving the ZIP before releasing its URL.
+ var url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(function(){URL.revokeObjectURL(url);},120000);
 }
 function fileStem(){return safeName(project.client||"TAG-Anchor-Testing")+"_"+safeName(project.date||"report");}
 function savePreset(){
@@ -938,6 +942,10 @@ async function exportWord(content){
     footers:{default:footer},children:ch}]
   });
   var blob=await d.Packer.toBlob(document);
+  // Fail explicitly rather than offering an empty/incomplete file to Word.
+  if(!blob||blob.size<1024)throw Error("Word document package was empty or incomplete.");
+  var magic=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+  if(magic[0]!==80||magic[1]!==75)throw Error("The Word document package is not a valid ZIP/DOCX.");
   download(blob,fileStem()+(complete?"_complete":"_graphs")+".docx");
   status((complete?"Complete editable Word report":"Graph-only Word document")+" exported with "+tests.length+" Crosby test graphs.");
  }catch(e){console.error(e);status("Word export failed: "+e.message,true);}
