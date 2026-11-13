@@ -359,6 +359,8 @@ function refresh(){
 }
 async function importFiles(files){
  if(!files||!files.length)return;
+ // Keep the full selection before the picker resets its live FileList.
+ files=Array.from(files);
  var successes=0,errors=[];
  for(var i=0;i<files.length;i++){
   var file=files[i];

@@ -310,6 +310,18 @@ test('imports preserve duplicate sample times, skip repeated files, and stop at 
   assert.match(h.get('csStatus').textContent, /50-file maximum/);
 });
 
+test('file-picker change imports every selection even after the input is cleared', async () => {
+  const h = load(), input = h.get('csFiles');
+  const files = Array.from({ length: 3 }, (_, i) => ({ name: `picker-${i}.csv`, text: async () => csv() }));
+  input.files = files;
+  // File inputs expose a live FileList that can be emptied by clearing value.
+  Object.defineProperty(input, 'value', { set(value) { if (value === '') files.length = 0; } });
+  input.emit('change');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.S.tests.length, 3);
+  assert.match(h.get('csStatus').textContent, /3 Crosby recordings imported/);
+});
+
 async function run() {
   const results = [];
   for (const { name, body } of tests) {
