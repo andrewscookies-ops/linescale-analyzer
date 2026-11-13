@@ -1,0 +1,30 @@
+
+/* Modular LineScale shading controls + Crosby touch gestures */
+#csWorkflow #csCanvas{touch-action:none;cursor:grab}
+#csWorkflow .cs-view-tools{border:1px solid #334a50;background:#12242a;padding:9px;border-radius:10px}
+#csWorkflow .cs-view-tools button{font-size:12px;padding:7px 10px}
+#csWorkflow .cs-view-tools label{display:flex;align-items:center;gap:6px}
+#csWorkflow .cs-view-tools select{width:auto;margin:0}
+.graph-shade-editor{margin:10px 0;padding:11px 13px;border:1px solid #40546a;border-radius:12px;background:#14232f;color:#dbe9f2;font-size:12px}
+.graph-shade-editor[open]{padding-bottom:14px}
+.graph-shade-editor>summary{cursor:pointer;font-weight:700;font-size:13px;color:#8ae3cb;list-style-position:inside}
+.graph-shade-editor .shade-intro{font-size:12px;line-height:1.5;color:#a7beca;margin:8px 0 12px}
+.graph-shade-editor .shade-grid{display:grid;grid-template-columns:minmax(150px,1fr) 58px minmax(85px,1fr) minmax(135px,.9fr);align-items:center;gap:9px 10px}
+.graph-shade-editor .shade-grid .shade-head{font-size:11px;color:#9fb5c4;font-weight:650}
+.graph-shade-editor label{display:flex!important;flex-direction:row!important;align-items:center!important;gap:6px!important;margin:0!important;font-size:12px!important;color:inherit!important}
+.graph-shade-editor .shade-grid input[type="color"]{display:block;width:52px!important;min-width:52px;height:30px;padding:2px;border-radius:6px;cursor:pointer}
+.graph-shade-editor .shade-grid input[type="range"]{width:100%;min-width:60px;accent-color:#67e8c4}
+.graph-shade-editor .shade-grid input[type="checkbox"]{width:16px;height:16px;accent-color:#67e8c4;flex-shrink:0}
+.graph-shade-editor .shade-grid select{min-width:105px;width:100%;font-size:12px;padding:6px 8px}
+.graph-shade-editor .shade-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 0}
+.graph-shade-editor button{font-size:12px;padding:7px 10px}
+.graph-shade-editor .shade-hint{color:#aabed0;margin:9px 0 0}
+#reportPreview .graph-shade-editor{background:#f1f5f9;color:#263548;border-color:#b6c6d2}
+#reportPreview .graph-shade-editor>summary{color:#14624e}
+#reportPreview .graph-shade-editor .shade-intro,#reportPreview .graph-shade-editor .shade-hint{color:#516575}
+#reportPreview .graph-shade-editor .shade-grid .shade-head{color:#526579}
+@media(max-width:700px){
+ .graph-shade-editor .shade-grid{grid-template-columns:minmax(115px,1fr) 45px minmax(66px,1fr);gap:8px}
+ .graph-shade-editor .shade-grid .shade-scope{grid-column:1/-1}
+ .graph-shade-editor .shade-grid .shade-head:nth-child(4){display:none}
+}

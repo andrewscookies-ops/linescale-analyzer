@@ -11,6 +11,7 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 
 .brand-actions{display:flex;align-items:center;gap:10px}.share-dialog{color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:24px;width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;box-shadow:0 20px 80px #0008}.share-dialog::backdrop{background:#050a12bb}.share-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.share-heading h2{margin:0}.share-dialog label{margin:18px 0 6px;font-size:12px;color:var(--muted)}.share-dialog input{width:100%;min-width:0;font-size:12px}.share-qr{width:min(240px,100%);margin:20px auto 10px;padding:8px;background:white;border-radius:12px}.share-qr svg{display:block;width:100%;height:auto}.share-caption{text-align:center}.share-status{min-height:1.7em;color:var(--accent);font-size:12px}.share-dialog .toolbar{margin-bottom:4px}@media(max-width:480px){.brandbar{flex-wrap:wrap}.brand-actions{margin-left:auto}.share-dialog{padding:18px}}
 </style><link rel="stylesheet" href="crosby-report-v1.css?v=1">
+<link rel="stylesheet" href="tag-linescale-shading-v1.css?v=1">
 <link rel="stylesheet" href="tag-workflow-switch-v1.css?v=1">
 </head><body><main class="container"><header class="brandbar"><div class="brand">The Adventure Guild</div><div class="brand-actions"><button type="button" class="pill" onclick="openShare()" aria-haspopup="dialog">Share ↗</button><a class="pill" href="#setup" onclick="document.getElementById('setup').open=true">DEVICE SETUP ↗</a></div></header>
 <section class="card hero"><h1>TAG Load-cell Analyzer</h1><div class="muted"><strong>LineScale logs</strong> · Import up to 50 CSVs. Keep the useful recordings, remove the extras, and compare each test type separately.</div>
@@ -226,7 +227,138 @@ function bindGraphLines(root,redraw){
  });
  root.addEventListener('input',e=>{const field=e.target.dataset.lineField;if(!field)return;const key=e.target.closest('[data-line-key]').dataset.lineKey,id=e.target.closest('[data-line-id]').dataset.lineId;if(updateGraphLine(key,id,field,e.target.value)){e.target.setCustomValidity('');refreshLineDrawing(root,key);}else e.target.setCustomValidity('Enter a finite numeric value.');});
 }
-const graphLinePlugin={id:'referenceLines',afterDraw(c){
+
+// Independent visual shading for LineScale preview and exported report graphs.
+const graphShadeSettings={};
+function shadeSetting(key){
+ return graphShadeSettings[key]||(graphShadeSettings[key]={
+  band:false,bandColor:'#f59e0b',bandAlpha:.18,
+  above:false,aboveColor:'#22c55e',aboveAlpha:.18,aboveScope:'all',
+  below:false,belowColor:'#3b82f6',belowAlpha:.18,belowScope:'all'
+ });
+}
+function shadeLines(key,override){
+ return (override||graphLines[key]||[]).filter(l=>l.axis==='time'&&Number.isFinite(Number(l.value)))
+   .slice(0,2).map(l=>Number(l.value)).sort((a,b)=>a-b);
+}
+function shadeValidColor(hex){return /^#[0-9a-f]{6}$/i.test(hex)?hex:'#777777';}
+function shadeOpacity(v){return Math.max(0,Math.min(.75,Number(v)||0));}
+function shadeCSSColor(hex,alpha){
+ var h=shadeValidColor(hex);return 'rgba('+parseInt(h.slice(1,3),16)+','+
+ parseInt(h.slice(3,5),16)+','+parseInt(h.slice(5,7),16)+','+shadeOpacity(alpha)+')';
+}
+function graphShadeEditor(key){
+ var s=shadeSetting(key),markers=shadeLines(key);
+ function row(prop,name,color,alpha,scope){
+  var a='<label><input type="checkbox" data-shade-prop="'+prop+'"'+(s[prop]?' checked':'')+'> '+name+'</label>';
+  a+='<input type="color" data-shade-prop="'+color+'" value="'+shadeValidColor(s[color])+'" aria-label="'+name+' color">';
+  a+='<input type="range" data-shade-prop="'+alpha+'" min="0" max=".75" step=".05" value="'+s[alpha]+'" aria-label="'+name+' opacity">';
+  if(scope)a+='<select class="shade-scope" data-shade-prop="'+scope+'" aria-label="'+name+' range"><option value="all"'+(s[scope]==='all'?' selected':'')+'>Entire graph</option><option value="markers"'+(s[scope]==='markers'?' selected':'')+'>Between markers</option></select>';
+  else a+='<span class="shade-scope">A–B span</span>';
+  return a;
+ }
+ return '<details class="graph-shade-editor" data-shade-key="'+key+'"><summary>Shading & fills (optional)</summary>'+
+ '<p class="shade-intro">Choose each fill independently. The first two vertical time markers are A and B. Turning on marker shading creates them automatically if needed.</p>'+
+ '<div class="shade-grid"><span class="shade-head">Region</span><span class="shade-head">Color</span><span class="shade-head">Opacity</span><span class="shade-head">Range</span>'+
+ row('band','Between markers','bandColor','bandAlpha',null)+
+ row('above','Above force line','aboveColor','aboveAlpha','aboveScope')+
+ row('below','Below force line','belowColor','belowAlpha','belowScope')+'</div>'+
+ '<p class="shade-hint">Drag/edit time markers to change shaded boundaries. With multiple logs, shading follows the first plotted recording. Fills do not affect calculations.</p></details>';
+}
+function ensureShadeTimeMarkers(key){
+ var current=(graphLines[key]||[]).filter(l=>l.axis==='time');
+ if(current.length>=2)return false;
+ var view=graphViews[key]||graphFrames[key]?.view;if(!view)return false;
+ for(var i=current.length;i<2;i++){
+  var line=addGraphLine(key,'time');
+  if(line){line.label=i===0?'A':'B';line.value=view.xmin+(view.xmax-view.xmin)*(i===0?.25:.75);}
+ }
+ return true;
+}
+function bindGraphShading(root,redraw){
+ if(root.dataset.shadeBound)return;root.dataset.shadeBound='1';
+ root.addEventListener('input',function(e){
+  var input=e.target;
+  if(!input.matches('[data-shade-prop]'))return;
+  var block=input.closest('[data-shade-key]');if(!block)return;
+  var key=block.dataset.shadeKey,prop=input.dataset.shadeProp,s=shadeSetting(key);
+  s[prop]=input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value;
+  if((prop==='band'&&s.band||((prop==='aboveScope'||prop==='belowScope')&&input.value==='markers'))&&ensureShadeTimeMarkers(key)){
+   redraw();
+   setTimeout(function(){var panel=root.querySelector('[data-shade-key="'+key+'"]');if(panel)panel.open=true;},0);
+  }else if(root.id==='mainGraphInteraction'){if(chart)chart.update('none');}
+  else refreshLineDrawing(root,key);
+ });
+}
+function shadeClipData(points,left,right){
+ if(!points||points.length<2||right<=left)return [];
+ left=Math.max(left,points[0].x);right=Math.min(right,points[points.length-1].x);
+ if(right<=left)return [];
+ function interp(t){
+  var lo=0,hi=points.length-1;
+  while(hi-lo>1){var m=(hi+lo)>>1;if(points[m].x<=t)lo=m;else hi=m;}
+  var a=points[lo],b=points[hi],d=b.x-a.x;
+  return {x:t,y:d?a.y+(b.y-a.y)*(t-a.x)/d:a.y};
+ }
+ var out=[interp(left)];
+ for(var p of points)if(p.x>left&&p.x<right)out.push(p);
+ out.push(interp(right));
+ return out;
+}
+function shadePoints(points,view,region,setting,markers){
+ var left=view.xmin,right=view.xmax;
+ if(setting[region+'Scope']==='markers'){
+  if(markers.length<2)return [];
+  left=Math.max(left,markers[0]);right=Math.min(right,markers[1]);
+ }
+ return shadeClipData(points,left,right);
+}
+function shadeOnCanvas(c){
+ var key=c.$lineKey,s=graphShadeSettings[key],area=c.chartArea;
+ if(!s||!area||!c.data?.datasets?.[0]?.data?.length)return;
+ var pts=c.data.datasets[0].data,x=c.scales.x,y=c.scales.y,markers=shadeLines(key),ctx=c.ctx;
+ ctx.save();ctx.beginPath();ctx.rect(area.left,area.top,area.right-area.left,area.bottom-area.top);ctx.clip();
+ if(s.band&&markers.length===2&&markers[1]>markers[0]){
+  ctx.fillStyle=shadeCSSColor(s.bandColor,s.bandAlpha);
+  ctx.fillRect(x.getPixelForValue(markers[0]),area.top,x.getPixelForValue(markers[1])-x.getPixelForValue(markers[0]),area.bottom-area.top);
+ }
+ for(var region of ['above','below']){
+  if(!s[region])continue;
+  var subset=shadePoints(pts,{xmin:x.min,xmax:x.max},region,s,markers);
+  if(subset.length<2)continue;
+  var baseline=region==='above'?area.top:area.bottom;
+  ctx.beginPath();ctx.moveTo(x.getPixelForValue(subset[0].x),baseline);
+  for(var p of subset)ctx.lineTo(x.getPixelForValue(p.x),y.getPixelForValue(p.y));
+  ctx.lineTo(x.getPixelForValue(subset[subset.length-1].x),baseline);ctx.closePath();
+  ctx.fillStyle=shadeCSSColor(s[region+'Color'],s[region+'Alpha']);ctx.fill();
+ }
+ ctx.restore();
+}
+function shadeInSVG(key,o,items,view,x,y,L,T,pw,ph,clip){
+ var s=o.shading?.[key]||graphShadeSettings[key];
+ if(!s||!items.length||!RATE[items[0].mode])return '';
+ var markers=shadeLines(key,o.annotations?.[key]),log=items[0],hz=RATE[log.mode],d=log.points;
+ var start=Math.max(0,Math.min(d.length-1,Math.floor(view.xmin*hz)-2));
+ var stop=Math.min(d.length,Math.max(start+2,Math.ceil(view.xmax*hz)+3));
+ var pts=chartPoints(d.slice(start,stop),hz).map(p=>({x:p.x+start/hz,y:p.y}));
+ var output='';
+ if(s.band&&markers.length===2&&markers[1]>markers[0]){
+  output+='<rect clip-path="url(#'+clip+')" x="'+x(markers[0])+'" y="'+T+'" width="'+((markers[1]-markers[0])*pw/(view.xmax-view.xmin))+'" height="'+ph+'" fill="'+shadeValidColor(s.bandColor)+'" fill-opacity="'+shadeOpacity(s.bandAlpha)+'"/>';
+ }
+ for(var region of ['above','below']){
+  if(!s[region])continue;
+  var subset=shadePoints(pts,view,region,s,markers);
+  if(subset.length<2)continue;
+  var base=region==='above'?T:T+ph;
+  var dpath='M'+x(subset[0].x).toFixed(2)+' '+base;
+  for(var p of subset)dpath+=' L'+x(p.x).toFixed(2)+' '+y(p.y).toFixed(2);
+  dpath+=' L'+x(subset[subset.length-1].x).toFixed(2)+' '+base+' Z';
+  output+='<path clip-path="url(#'+clip+')" d="'+dpath+'" fill="'+shadeValidColor(s[region+'Color'])+'" fill-opacity="'+shadeOpacity(s[region+'Alpha'])+'"/>';
+ }
+ return output;
+}
+
+const graphLinePlugin={id:'referenceLines',beforeDatasetsDraw(c){shadeOnCanvas(c);},afterDraw(c){
  const key=c.$lineKey;if(!key||!c.chartArea)return;
  const {ctx,chartArea:a,scales}=c;ctx.save();ctx.beginPath();ctx.rect(a.left,a.top,a.right-a.left,a.bottom-a.top);ctx.clip();ctx.font='12px sans-serif';
  for(const line of graphLines[key]||[]){const horizontal=line.axis==='force',pos=(horizontal?scales.y:scales.x).getPixelForValue(line.value);if(!Number.isFinite(pos)||pos<(horizontal?a.top:a.left)||pos>(horizontal?a.bottom:a.right))continue;
@@ -263,7 +395,7 @@ function graphPan(v,dx,dy,axis='both'){
  const x=axis==='force'?0:dx*(v.xmax-v.xmin),y=axis==='time'?0:dy*(v.ymax-v.ymin);
  return {xmin:v.xmin-x,xmax:v.xmax-x,ymin:v.ymin+y,ymax:v.ymax+y};
 }
-function graphToolbar(key){return `<div class="graph-tools" data-graph-tools="${key}"><button type="button" data-view-action="in" aria-label="Zoom in">＋</button><button type="button" data-view-action="out" aria-label="Zoom out">−</button><label>Axes <select aria-label="Zoom and pan axes" data-view-axis><option value="both" ${!graphAxes[key]||graphAxes[key]==='both'?'selected':''}>Both</option><option value="time" ${graphAxes[key]==='time'?'selected':''}>Time</option><option value="force" ${graphAxes[key]==='force'?'selected':''}>Force</option></select></label><button type="button" data-view-action="left" aria-label="Pan left">←</button><button type="button" data-view-action="right" aria-label="Pan right">→</button><button type="button" data-view-action="up" aria-label="Pan up">↑</button><button type="button" data-view-action="down" aria-label="Pan down">↓</button><button type="button" data-view-action="reset">Reset / Fit</button></div>${graphLineEditor(key)}`;}
+function graphToolbar(key){return `<div class="graph-tools" data-graph-tools="${key}"><button type="button" data-view-action="in" aria-label="Zoom in">＋</button><button type="button" data-view-action="out" aria-label="Zoom out">−</button><label>Axes <select aria-label="Zoom and pan axes" data-view-axis><option value="both" ${!graphAxes[key]||graphAxes[key]==='both'?'selected':''}>Both</option><option value="time" ${graphAxes[key]==='time'?'selected':''}>Time</option><option value="force" ${graphAxes[key]==='force'?'selected':''}>Force</option></select></label><button type="button" data-view-action="left" aria-label="Pan left">←</button><button type="button" data-view-action="right" aria-label="Pan right">→</button><button type="button" data-view-action="up" aria-label="Pan up">↑</button><button type="button" data-view-action="down" aria-label="Pan down">↓</button><button type="button" data-view-action="reset">Reset / Fit</button></div>${graphLineEditor(key)}${graphShadeEditor(key)}`;}
 function graphAction(key,action,redraw){
  const v=graphViews[key]||graphFrames[key]?.view;if(!v)return;
  if(action==='reset')delete graphViews[key];
@@ -274,6 +406,7 @@ function graphAction(key,action,redraw){
 function bindGraphGestures(root,findGraph,redraw){
  if(root.dataset.viewBound)return;root.dataset.viewBound='true';
  bindGraphLines(root,redraw);
+ bindGraphShading(root,redraw);
  const pointers=new Map();let gesture=null;
  const fraction=(e,rect)=>({x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height});
  function rebase(){if(!gesture)return;gesture.base={...(graphViews[gesture.key]||graphFrames[gesture.key].view)};gesture.start=[...pointers.values()];}
@@ -342,6 +475,7 @@ function reportGraph(items,o){
  svg+=`<path d="M${L} ${T}v${ph}h${pw}" stroke="#263548" fill="none"/><g font-family="Arial,sans-serif" font-size="14" fill="#263548"><text x="${W/2}" y="${H-5}" text-anchor="middle">Time from recording start (s)</text><text transform="translate(18 ${H/2}) rotate(-90)" text-anchor="middle">Force (lbf)</text></g>`;
  const colors=['#006c91','#b7410e','#6246a5','#007c58','#ab2670','#725015'];
  const legend=[];
+ svg+=shadeInSVG(key,o,items,view,x,y,L,T,pw,ph,clip);
  items.forEach((l,i)=>{const color=o.palette==='mono'?'#111':colors[i%colors.length],dash=i%4===0?'':i%4===1?'9 4':i%4===2?'3 3':'12 3 3 3';
  const hz=RATE[l.mode],start=Math.max(0,Math.min(l.points.length-1,Math.floor(view.xmin*hz)-1)),stop=Math.max(start+1,Math.min(l.points.length,Math.ceil(view.xmax*hz)+2));
  const pts=chartPoints(l.points.slice(start,stop),hz).map(p=>({...p,x:p.x+start/hz})).map(p=>`${x(p.x).toFixed(2)},${y(p.y).toFixed(2)}`).join(' ');
@@ -385,6 +519,7 @@ function reportCSV(rows,o,stamp){
 function exportReportFile(kind){
  try{if($('reportPreview').querySelector?.('.graph-line-editor input:invalid'))throw Error('Enter valid reference-line values before exporting.');const items=reportSelection(),o=reportOptions();if(!items.length)throw Error('Check at least one recording to export.');
  o.annotations=Object.fromEntries(Object.entries(graphLines).map(([key,lines])=>[key,lines.map(line=>({...line}))]));
+ o.shading=Object.fromEntries(Object.entries(graphShadeSettings).map(([key,style])=>[key,{...style}]));
  o.views=Object.fromEntries(Object.entries(graphFrames).map(([k,f])=>[k,{...(graphViews[k]||f.view)}]));
  const stamp=new Date().toISOString(),rows=items.map(l=>reportMetric(l,o));$('reportError').textContent='';
  if(kind==='csv')return reportDownload(reportCSV(rows,o,stamp),'text/csv;charset=utf-8','csv');
