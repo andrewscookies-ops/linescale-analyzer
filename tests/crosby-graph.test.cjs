@@ -147,6 +147,42 @@ test('explicit views survive graph construction and Focus A–B remains availabl
   assert.deepEqual(markerTimes(t), [10, 12]);
 });
 
+test('Word report content section has its requested heading', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  assert.match(source, /<summary>3 · Word Report Content<\/summary>/);
+  assert.doesNotMatch(source, /Editable Word report content/);
+});
+
+test('Auto Scale restores 0–4,000 lb while centering time around A/B markers', () => {
+  const h = load(), t = select(h, recording(h, {
+    view: { xmin: 0, xmax: 120, ymin: 200, ymax: 6000 }
+  }));
+  Object.assign(t.style, { a: 25, b: 35, showA: true, showB: true });
+  const styleBefore = plain(t.style), pointsBefore = t.points;
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view), { xmin: 15, xmax: 45, ymin: 0, ymax: 4000 });
+  assert.deepEqual([h.S.chart.options.scales.y.min, h.S.chart.options.scales.y.max], [0, 4000]);
+  assert.deepEqual(plain(t.style), styleBefore);
+  assert.equal(t.points, pointsBefore);
+
+  // Keep the requested window inside the recorded time span at either edge.
+  setTimes(t, 100, 110);
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view), { xmin: 90, xmax: 120, ymin: 0, ymax: 4000 });
+  setTimes(t, 5, 15);
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view), { xmin: 0, xmax: 30, ymin: 0, ymax: 4000 });
+  setTimes(t, 35, 25);
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view), { xmin: 15, xmax: 45, ymin: 0, ymax: 4000 });
+
+  // Hidden markers must not silently change the existing view.
+  t.style.showA = false;
+  const previousView = plain(t.view);
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view), previousView);
+});
+
 test('A–B statistics show 0.02 and 0.001 seconds rather than rounding them away', () => {
   const h = load(), t = recording(h);
   for (const [a, b, expected] of [[1.3, 1.32, 0.02], [1, 1.001, 0.001]]) {
