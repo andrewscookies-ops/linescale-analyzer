@@ -121,12 +121,12 @@ function install(){
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
- '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Set markers around load hold</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
+ '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Set markers around load hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
  '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted">The initial view focuses on A–B with a few seconds of context. Each dot is a recorded sample (typically 1 reading per second). Zoom in for individual second labels, or choose Reset / Fit for the entire recording. Drag A / B to fine-tune; actual observed times are never forced to 10 seconds.</p>',
- '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step=".1" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
- '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step=".1" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
+ '<p class="cs-muted">The initial view shows the entire recording from 0 seconds. Choose Focus A–B or zoom in for individual second labels and measurement dots (typically 1 reading per second). Reset / Fit restores the full recording. Drag A / B freely between samples; their separation is never forced to 10 seconds. Snap A/B to seconds aligns each marker to its nearest recorded sample once, then dragging remains free.</p>',
+ '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
+ '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
  '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
  '<label>Below-line fill range<select id="csBelowScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
  '</div>',
@@ -245,8 +245,7 @@ function fitCrosbyView(t){
  var m=Math.max(project.minimum,t.peak)*1.17;
  return {xmin:0,xmax:Math.max(1,t.duration),ymin:0,ymax:Math.max(500,Math.ceil(m/500)*500)};
 }
-// The automatic opening view uses the measured A–B span plus surrounding seconds.
-// It never alters the measurements or the marker values.
+// Explicit Focus A–B uses the marker span plus context without moving markers.
 function focusCrosbyView(t){
  var full=fitCrosbyView(t),a=Number(t.style?.a),b=Number(t.style?.b);
  if(!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(b-a)<.5)return full;
@@ -258,7 +257,7 @@ function focusCrosbyView(t){
  var left=Math.max(0,Math.min(t.duration-width,middle-width/2));
  return {xmin:+left.toFixed(3),xmax:+(left+width).toFixed(3),ymin:full.ymin,ymax:full.ymax};
 }
-function crosbyView(t){return t.view?Object.assign({},t.view):focusCrosbyView(t);}
+function crosbyView(t){return t.view?Object.assign({},t.view):fitCrosbyView(t);}
 function crosbyTickStep(viewSpan,chartWidth){
  var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
  var steps=[.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
@@ -319,7 +318,7 @@ function refreshCrosbyStats(t){
  var step=crosbySampleSeconds(t),sampler=step===null?"":(Math.abs(step-1)<.07?"1 Hz sampling":"Typical sample interval: "+step.toFixed(2)+" s");
  $("csStats").innerHTML="<span>Peak: <strong>"+Math.round(t.peak).toLocaleString()+" lb</strong></span>"+
   "<span>Recorded hold ≥ "+project.minimum.toLocaleString()+" lb: <strong>"+measured.hold.toFixed(1)+" s</strong></span>"+
-  "<span>A–B markers: <strong>"+span.toFixed(1)+" s</strong> ("+count+" measured points)</span>"+
+  "<span>A–B markers: <strong>"+Number(span.toFixed(3))+" s</strong> ("+count+" measured points)</span>"+
   "<span>"+sampler+"</span><span>Rating: "+esc(t.rating)+" (manual)</span>";
 }
 function draw(){
@@ -356,10 +355,12 @@ function refresh(){
  renderRows();
  if(selected())preview(S.current);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
- ["csWord","csPdf","csPng","csStyleAll","csWindow"].forEach(function(id){$(id).disabled=!S.tests.length;});
+ ["csWord","csPdf","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
 }
 async function importFiles(files){
  if(!files||!files.length)return;
+ // Keep the full selection before the picker resets its live FileList.
+ files=Array.from(files);
  var successes=0,errors=[];
  for(var i=0;i<files.length;i++){
   var file=files[i];
@@ -380,6 +381,20 @@ function setWindow(){
  for(var i=pts.length-1;i>=0;i--)if(pts[i].y>=threshold){last=pts[i];break;}
  if(!first||!last){status("No samples cross the threshold in this recording.",true);return;}
  t.style.a=first.x;t.style.b=last.x;t.style.showA=true;t.style.showB=true;t.view=null;loadStyle();draw();
+}
+function snapCrosbyMarkers(){
+ var t=selected();if(!t||!t.points.length)return;
+ ["a","b"].forEach(function(key){
+  var value=Number(t.style[key]);if(!Number.isFinite(value))return;
+  // Use actual recorded timestamps, including gaps; equal distances choose earlier.
+  var nearest=t.points[0].x;
+  t.points.forEach(function(p){
+   var tolerance=4*Number.EPSILON*Math.max(1,Math.abs(value),Math.abs(nearest),Math.abs(p.x));
+   if(Math.abs(p.x-value)<Math.abs(nearest-value)-tolerance)nearest=p.x;
+  });
+  t.style[key]=nearest;
+ });
+ loadStyle();draw();
 }
 function copyStyle(){
  var t=selected();if(!t)return;
@@ -474,7 +489,7 @@ function dragBind(){
   var g=S.gesture;
   if(g?.type==="marker"&&S.pointers.size===1){
    var x=ch.scales.x.getValueForPixel(p.x);
-   if(Number.isFinite(x)){t.style[g.key]=Math.max(0,Math.min(t.duration,Math.round(x*100)/100));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
+   if(Number.isFinite(x)){t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
   }else panOrPinch();
   e.preventDefault();
  });
@@ -554,7 +569,7 @@ async function exportPDF(){
  var tests=ordered();if(!tests.length){status("Include at least one Crosby recording.",true);return;}
  try{
   status("Preparing "+tests.length+" graphs for PDF…");
-  await loadLibrary("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js","jspdf");
+  await loadLibrary("https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js","jspdf");
   var images=await graphImages(tests),PDF=window.jspdf.jsPDF,pdf=new PDF({unit:"pt",format:"letter",orientation:"portrait",compress:true});
   var per=project.graphsPerPage===3?3:2;
   var margin=34,width=612-margin*2;
@@ -686,6 +701,7 @@ function bind(){
  $("csPrevious").addEventListener("click",function(){preview((S.current-1+S.tests.length)%S.tests.length);});
  $("csNext").addEventListener("click",function(){preview((S.current+1)%S.tests.length);});
  $("csWindow").addEventListener("click",setWindow);
+ $("csSnapMarkers").addEventListener("click",snapCrosbyMarkers);
  $("csStyleAll").addEventListener("click",copyStyle);
  $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
  document.querySelectorAll("#csWorkflow [data-cs-view]").forEach(function(btn){
