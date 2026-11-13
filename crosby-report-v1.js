@@ -142,9 +142,11 @@ function install(){
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and choose the rating manually. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Rating</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
  '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Reset A/B to qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
- '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
+ '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="autoscale" title="10 seconds before A, 10 seconds after B">Auto Scale</button><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted">The initial view shows the entire recording from 0 seconds. Choose Focus A–B or zoom in for individual second labels and measurement dots (typically 1 reading per second). Reset / Fit restores the full recording. Drag A / B freely between samples; their separation is never forced to 10 seconds. Snap A/B to seconds aligns each marker to its nearest recorded sample once, then dragging remains free.</p>',
+ '<h4 style="margin:12px 0 5px;font-size:13px">X-axis range</h4>',
+ '<div class="cs-edit" role="group" aria-label="Crosby X-axis range"><label>X-axis start (seconds)<input id="csXStart" type="number" step="any" placeholder="Start"></label><label>X-axis end (seconds)<input id="csXEnd" type="number" step="any" placeholder="End"></label></div>',
+ '<p class="cs-muted">Auto Scale shows 10 seconds before A and 10 seconds after B (30 seconds if A–B is 10 seconds). Enter exact X-axis start/end times to override the view. Focus A–B, zoom, pan and Reset / Fit remain available. A/B marker positions never change when scaling.</p>',
  '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
  '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
  '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
@@ -279,6 +281,39 @@ function focusCrosbyView(t){
  return {xmin:+left.toFixed(3),xmax:+(left+width).toFixed(3),ymin:full.ymin,ymax:full.ymax};
 }
 function crosbyView(t){return t.view?Object.assign({},t.view):fitCrosbyView(t);}
+// Display A/B with 10 seconds of context on either side. Keep the complete
+// requested window where feasible, shifting near recording boundaries.
+function autoScaleCrosbyView(t){
+ if(!t||!t.style?.showA||!t.style?.showB)return null;
+ var a=Number(t.style.a),b=Number(t.style.b);
+ if(!Number.isFinite(a)||!Number.isFinite(b))return null;
+ var lo=Math.min(a,b),hi=Math.max(a,b),width=Math.max(1,hi-lo+20);
+ var start=Math.max(0,lo-10);
+ if(Number.isFinite(t.duration)&&t.duration>=width&&start+width>t.duration)
+  start=Math.max(0,t.duration-width);
+ var v=crosbyView(t);
+ return {xmin:start,xmax:start+width,ymin:v.ymin,ymax:v.ymax};
+}
+function validateCrosbyAxisRange(start,end){
+ var lo=Number(start),hi=Number(end);
+ if(String(start).trim()===""||String(end).trim()===""||
+    !Number.isFinite(lo)||!Number.isFinite(hi)||hi<=lo)return null;
+ return {xmin:lo,xmax:hi};
+}
+function syncCrosbyAxisInputs(t){
+ var start=$("csXStart"),end=$("csXEnd");if(!start||!end)return;
+ if(!t){start.value="";end.value="";return;}
+ var v=crosbyView(t);
+ start.value=String(Number(v.xmin.toFixed(3)));
+ end.value=String(Number(v.xmax.toFixed(3)));
+}
+function applyCrosbyAxisInputs(){
+ var t=selected();if(!t)return;
+ var range=validateCrosbyAxisRange($("csXStart").value,$("csXEnd").value);
+ if(!range){status("Enter valid X-axis start and end times; end must be greater than start.",true);return;}
+ setCrosbyView(Object.assign(crosbyView(t),range));
+}
+
 function crosbyTickStep(viewSpan,chartWidth){
  var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
  var steps=[.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
@@ -346,11 +381,11 @@ function refreshCrosbyStats(t){
 function draw(){
  var t=selected(),canvas=$("csCanvas");if(!canvas)return;
  if(S.chart){S.chart.destroy();S.chart=null;}
- if(!t){$("csGraphHeading").textContent="2 · Graph editor — import data to begin";$("csStats").textContent="";return;}
+ if(!t){$("csGraphHeading").textContent="2 · Graph editor — import data to begin";$("csStats").textContent="";syncCrosbyAxisInputs(null);return;}
  if(typeof Chart==="undefined"){status("Chart.js is unavailable. Check network access.",true);return;}
  $("csGraphHeading").textContent="2 · "+(t.title||"Anchor") + " — Crosby log "+t.id;
  refreshCrosbyStats(t);
- S.chart=new Chart(canvas,graphConfig(t));S.chart.$crosby=t;S.chart.update("none");
+ S.chart=new Chart(canvas,graphConfig(t));S.chart.$crosby=t;S.chart.update("none");syncCrosbyAxisInputs(t);
 }
 function renderRows(){
  var host=$("csRows");if(!host)return;
@@ -378,6 +413,8 @@ function refresh(){
  if(selected())preview(S.current);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
  ["csWord","csPdf","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
+ var autoBtn=document.querySelector('#csWorkflow [data-cs-view="autoscale"]');
+ if(autoBtn)autoBtn.disabled=!S.tests.length;
 }
 async function importFiles(files){
  if(!files||!files.length)return;
@@ -461,10 +498,16 @@ function setCrosbyView(v){
  ch.options.scales.x.min=v.xmin;ch.options.scales.x.max=v.xmax;
  ch.options.scales.x.ticks.stepSize=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
  ch.options.scales.y.min=v.ymin;ch.options.scales.y.max=v.ymax;ch.update("none");
+ syncCrosbyAxisInputs(t);
 }
 function crosbyAction(action){
  var t=selected();if(!t||!S.chart)return;
  if(action==="reset"){setCrosbyView(fitCrosbyView(t));return;}
+ if(action==="autoscale"){
+  var view=autoScaleCrosbyView(t);
+  if(!view){status("Show A and B markers to use Auto Scale.",true);return;}
+  setCrosbyView(view);return;
+ }
  if(action==="focus"){setCrosbyView(focusCrosbyView(t));return;}
  var v=crosbyView(t);
  if(action==="in"||action==="out"){setCrosbyView(crosbyZoom(v,action==="in"?.8:1.25,.5,.5));return;}
@@ -536,7 +579,7 @@ function dragBind(){
 }
 
 function reportData(){
- return {project:Object.assign({},project),tests:S.tests.map(function(t){return {id:t.id,name:t.name,anchor:t.anchor,title:t.title,rating:t.rating,comments:t.comments,style:t.style,enabled:t.enabled,markerManual:!!t.markerManual};})};
+ return {project:Object.assign({},project),tests:S.tests.map(function(t){return {id:t.id,name:t.name,anchor:t.anchor,title:t.title,rating:t.rating,comments:t.comments,style:t.style,enabled:t.enabled,markerManual:!!t.markerManual,view:t.view?Object.assign({},t.view):null};})};
 }
 function download(blob,name){
  var url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},10000);
@@ -563,6 +606,10 @@ async function loadPreset(file){
     current.markerManual=typeof saved.markerManual==="boolean"?saved.markerManual:true;
     if(!current.markerManual)placeAutomaticMarkers(current,true);
    }
+   var v=saved.view;
+   if(v&&["xmin","xmax","ymin","ymax"].every(function(k){return Number.isFinite(v[k]);})&&
+       v.xmax>v.xmin&&v.ymax>v.ymin)
+    current.view={xmin:v.xmin,xmax:v.xmax,ymin:v.ymin,ymax:v.ymax};
   });
   refresh();status("Saved setup loaded. Import matching CSVs first to restore their individual mappings and styles.");
  }catch(e){status("Could not load setup: "+e.message,true);}
@@ -735,6 +782,7 @@ function bind(){
  $("csSnapMarkers").addEventListener("click",snapCrosbyMarkers);
  $("csStyleAll").addEventListener("click",copyStyle);
  $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
+ ["csXStart","csXEnd"].forEach(function(id){$(id).addEventListener("change",applyCrosbyAxisInputs);});
  document.querySelectorAll("#csWorkflow [data-cs-view]").forEach(function(btn){
   btn.addEventListener("click",function(){crosbyAction(btn.dataset.csView);});
  });
