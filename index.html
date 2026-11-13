@@ -11,6 +11,7 @@ html{scroll-behavior:smooth;scroll-padding-top:20px}.quickstart{display:grid;gri
 
 .brand-actions{display:flex;align-items:center;gap:10px}.share-dialog{color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:24px;width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;box-shadow:0 20px 80px #0008}.share-dialog::backdrop{background:#050a12bb}.share-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.share-heading h2{margin:0}.share-dialog label{margin:18px 0 6px;font-size:12px;color:var(--muted)}.share-dialog input{width:100%;min-width:0;font-size:12px}.share-qr{width:min(240px,100%);margin:20px auto 10px;padding:8px;background:white;border-radius:12px}.share-qr svg{display:block;width:100%;height:auto}.share-caption{text-align:center}.share-status{min-height:1.7em;color:var(--accent);font-size:12px}.share-dialog .toolbar{margin-bottom:4px}@media(max-width:480px){.brandbar{flex-wrap:wrap}.brand-actions{margin-left:auto}.share-dialog{padding:18px}}
 </style><link rel="stylesheet" href="crosby-report-v1.css?v=1">
+<link rel="stylesheet" href="tag-workflow-switch-v1.css?v=1">
 </head><body><main class="container"><header class="brandbar"><div class="brand">The Adventure Guild</div><div class="brand-actions"><button type="button" class="pill" onclick="openShare()" aria-haspopup="dialog">Share ↗</button><a class="pill" href="#setup" onclick="document.getElementById('setup').open=true">DEVICE SETUP ↗</a></div></header>
 <section class="card hero"><h1>TAG Load-cell Analyzer</h1><div class="muted"><strong>LineScale logs</strong> · Import up to 50 CSVs. Keep the useful recordings, remove the extras, and compare each test type separately.</div>
 <div class="quickstart" aria-label="How to use"><div><b><span>1</span> Import your logs</b><p>Click Import CSV files. Hold Command on Mac or Ctrl on Windows to choose multiple files.</p></div><div><b><span>2</span> Review a folder</b><p>Choose Dynamic or Static below. Click a filename to see its graph. Use Previous / Next to review the rest.</p></div><div><b><span>3</span> Compare or remove</b><p>Check the logs you want, then turn on Compare selected logs or click Remove selected. Undo restores the last removal.</p></div></div>
@@ -468,5 +469,6 @@ async function exportReport(kind){
 
 render();loadLogConnection();
 </script><script src="crosby-report-v1.js?v=1"></script>
+<script src="tag-workflow-switch-v1.js?v=1"></script>
 </body></html>
 
