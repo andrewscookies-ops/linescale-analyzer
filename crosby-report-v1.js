@@ -714,7 +714,7 @@ function renderFullPDFIntro(doc,tests){
   });y+=h;
  }
  tableRow(headers,true);
- tests.forEach(function(t){tableRow([t.title||("Anchor "+t.anchor),Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id],false);});
+ tests.forEach(function(t){tableRow([t.title||("Anchor "+t.anchor),appliedLoadLabel(),project.model+" / "+project.serial,t.id],false);});
  footer();doc.addPage();
 }
 
@@ -765,13 +765,104 @@ async function exportPDF(content){
 function paragraph(docx,text,opts){
  return new docx.Paragraph(Object.assign({text:String(text||""),spacing:{after:90}},opts||{}));
 }
-function docxTable(docx,rows,widths){
- var cells=rows.map(function(row,i){
-  return new docx.TableRow({children:row.map(function(val){
-   return new docx.TableCell({children:[new docx.Paragraph({text:String(val==null?"":val),spacing:{after:0},run:{size:18}})]});
+// The applied-load column records the minimum load specified for the test,
+// never the individual graph's peak (which is retained in the source data).
+function appliedLoadLabel(){
+ var n=Number(project.minimum);
+ return ">"+(Number.isFinite(n)&&n>=0?n:0).toLocaleString("en-US",{maximumFractionDigits:2})+" lbs";
+}
+function wordAnchorRows(tests){
+ return [["Anchor # and Location","Rating","Applied Load","Measuring Device","Sheet#"]].concat(
+  tests.map(function(t,i){
+   var rating=t.rating&&t.rating!=="Pending review"?String(t.rating):"Pending review";
+   var instrument=i===0?project.model+"\nSN: "+project.serial:"Crosby: "+project.serial;
+   return [t.title||("Anchor "+t.anchor),rating,appliedLoadLabel(),instrument,String(i+1)];
+  })
+ );
+}
+function tagRun(d,value,options){
+ return new d.TextRun(Object.assign({text:String(value==null?"":value),font:"Arial",size:20,color:"000000"},options||{}));
+}
+function tagP(d,children,options){
+ return new d.Paragraph(Object.assign({
+  children:Array.isArray(children)?children:[tagRun(d,children)],
+  spacing:{after:0}
+ },options||{}));
+}
+function tagEdge(d){
+ return {style:d.BorderStyle.SINGLE,size:5,color:"000000"};
+}
+function tagTable(d,rows,widths,options){
+ var o=options||{},edge=tagEdge(d),none={style:d.BorderStyle.NONE,size:0,color:"FFFFFF"};
+ var borders=o.borderless?
+  {top:none,bottom:none,left:none,right:none,insideHorizontal:none,insideVertical:none}:
+  {top:edge,bottom:edge,left:edge,right:edge,insideHorizontal:edge,insideVertical:edge};
+ var items=rows.map(function(row,rowIndex){
+  return new d.TableRow({children:row.map(function(value,i){
+   var isHeading=o.headingRows&&rowIndex<o.headingRows;
+   var paragraphText=String(value==null?"":value);
+   var parts=paragraphText.split("\n");
+   var text=[];
+   parts.forEach(function(part,j){
+    if(j)text.push(new d.TextRun({break:1}));
+    text.push(tagRun(d,part,{size:o.fontSize||20,bold:isHeading&&o.boldHeading===true}));
+   });
+   return new d.TableCell({
+    width:{size:widths[i],type:d.WidthType.DXA},
+    shading:isHeading?{fill:"BFBFBF"}:undefined,
+    margins:{top:35,bottom:35,left:85,right:85},
+    children:[tagP(d,text,{
+     alignment:o.centerAll||isHeading&&o.centerHeading?d.AlignmentType.CENTER:d.AlignmentType.LEFT
+    })]
+   });
   })});
  });
- return new docx.Table({rows:cells,width:{size:100,type:docx.WidthType.PERCENTAGE}});
+ return new d.Table({rows:items,width:{size:widths.reduce(function(a,b){return a+b;},0),type:d.WidthType.DXA},
+  columnWidths:widths,layout:d.TableLayoutType.FIXED,borders:borders});
+}
+function tagBar(d,label,center){
+ return tagTable(d,[[label]],[9360],{headingRows:1,boldHeading:true,centerHeading:!!center,fontSize:22});
+}
+function tagSectionBox(d,label,value){
+ return tagTable(d,[[label],[String(value||"")]],[9360],{headingRows:1,boldHeading:true,fontSize:20});
+}
+function tagField(d,label,value){
+ return tagP(d,[tagRun(d,label,{bold:true,size:20}),tagRun(d,"  "+String(value==null?"":value),{size:20})],{spacing:{after:0}});
+}
+function tagBrandedHeader(d,logo){
+ var none={style:d.BorderStyle.NONE,size:0,color:"FFFFFF"};
+ var logoCell=new d.TableCell({
+  width:{size:2600,type:d.WidthType.DXA},
+  margins:{top:0,bottom:0,left:0,right:0},
+  children:[tagP(d,[new d.ImageRun({type:"png",data:logo,transformation:{width:177,height:127}})],{spacing:{after:0}})]
+ });
+ var company=[
+  tagP(d,[tagRun(d,"The Adventure Guild",{font:"Calibri",size:48,bold:true})],{alignment:d.AlignmentType.CENTER}),
+  tagP(d,[tagRun(d,"P.O. Box 2621   Dunlap, TN 37327",{font:"Calibri",size:22})],{alignment:d.AlignmentType.CENTER}),
+  tagP(d,[tagRun(d,"(423) 266-5709- Southeast office   (570) 507-0329 – Northeast office",{font:"Calibri",size:22})],{alignment:d.AlignmentType.CENTER}),
+  tagP(d,[new d.ExternalHyperlink({children:[tagRun(d,"www.theadventureguild.com",{
+    font:"Calibri",size:22,color:"0000FF",underline:{color:"0000FF"}
+   })],link:"https://www.theadventureguild.com"})],{alignment:d.AlignmentType.CENTER})
+ ];
+ var infoCell=new d.TableCell({
+  width:{size:6760,type:d.WidthType.DXA},
+  margins:{top:0,bottom:0,left:0,right:0},children:company
+ });
+ return new d.Table({
+  rows:[new d.TableRow({children:[logoCell,infoCell]})],
+  width:{size:9360,type:d.WidthType.DXA},columnWidths:[2600,6760],
+  layout:d.TableLayoutType.FIXED,
+  borders:{top:none,bottom:none,left:none,right:none,insideHorizontal:none,insideVertical:none}
+ });
+}
+async function tagLogoBytes(){
+ // This is a compressed copy of the TAG logo embedded in the supplied original
+ // report; the asset lives alongside the hosted app and is embedded in the DOCX.
+ var response=await fetch("assets/tag-logo.base64");
+ if(!response.ok)throw Error("The TAG logo could not be loaded ("+response.status+").");
+ var b64=(await response.text()).trim();
+ if(!/^[A-Za-z0-9+/=]+$/.test(b64)||b64.length<1000)throw Error("TAG logo asset is invalid.");
+ return dataBytes("data:image/png;base64,"+b64);
 }
 function dataBytes(url){
  var b=atob(url.split(",")[1]),out=new Uint8Array(b.length);
@@ -783,49 +874,69 @@ async function exportWord(content){
  try{
   status("Preparing "+tests.length+" graphs and editable report fields for Word…");
   await loadLibrary("https://unpkg.com/docx@9.5.1/dist/index.iife.js","docx");
-  var d=window.docx,images=await graphImages(tests),ch=[];
-  var head=function(title){return paragraph(d,title,{heading:d.HeadingLevel.HEADING_2,spacing:{before:170,after:80}});};
-  var body=function(text){return paragraph(d,text,{spacing:{after:130}});};
+  var d=window.docx,images=await graphImages(tests),ch=[],logo=complete?await tagLogoBytes():null;
   if(complete){
-  ch.push(paragraph(d,"The Adventure Guild",{heading:d.HeadingLevel.HEADING_1,alignment:d.AlignmentType.CENTER,spacing:{after:20}}));
-  ch.push(paragraph(d,"P.O. Box 2621  ·  Dunlap, TN 37327  |  (423) 266-5709  |  www.theadventureguild.com",{alignment:d.AlignmentType.CENTER,spacing:{after:110}}));
-  ch.push(paragraph(d,"Ground Anchor Testing",{heading:d.HeadingLevel.HEADING_1,alignment:d.AlignmentType.CENTER,spacing:{after:120}}));
-  ch.push(docxTable(d,[
-   ["Testing Date",project.date],["Client",project.client],["Location",project.location],
-   ["Project Manager",project.manager],["Testing Performed By",project.tester],["Number of Anchors Tested",String(tests.length)]
-  ]));
-  ch.push(head("Testing Policy"));ch.push(body(project.policy));
-  ch.push(head("Disclaimer"));ch.push(body(project.disclaimer));
-  ch.push(head("Challenge Course Description"));ch.push(body(project.course));
-  ch.push(head("Description of Testing Procedure"));ch.push(body(project.procedure));
-  ch.push(head("Testing Ratings and Comments"));
-  ch.push(body("Pass: "+project.pass));ch.push(body("Fail: "+project.fail));ch.push(body("Not Inspected (NI): "+project.ni));
-  ch.push(paragraph(d,"Anchors",{heading:d.HeadingLevel.HEADING_1,pageBreakBefore:true}));
-  ch.push(body("Minimum "+project.minimum.toLocaleString()+" lb | Hold duration "+project.hold+" s | Measuring device "+project.model+" | Serial "+project.serial));
-  if(S.planImage){
-   var planWidth=Math.min(470,Math.round(235/Math.max(.01,S.planImage.ratio)));ch.push(new d.Paragraph({children:[new d.ImageRun({type:S.planImage.type==="image/png"?"png":"jpg",data:S.planImage.bytes,transformation:{width:planWidth,height:Math.round(planWidth*S.planImage.ratio)}})],spacing:{after:100}}));
+   // The branded first page follows the uploaded TAG report: original logo,
+   // Calibri company heading, contact details and live blue underlined URL.
+   ch.push(tagBrandedHeader(d,logo));
+   ch.push(tagBar(d,"Ground Anchor Testing",true));
+   ch.push(tagField(d,"Testing Date:",project.date));
+   ch.push(tagField(d,"Client:",project.client));
+   ch.push(tagField(d,"Location:",project.location));
+   ch.push(tagField(d,"Project Manager:",project.manager));
+   ch.push(tagField(d,"Testing Performed by:",project.tester));
+   ch.push(tagField(d,"Number of Anchors Tested:",String(tests.length)));
+   ch.push(tagP(d,"",{spacing:{after:90}}));
+   ch.push(tagP(d,[tagRun(d,"Testing Policy",{font:"Calibri",size:22,bold:true,underline:{}})],{spacing:{before:80,after:0}}));
+   ch.push(tagP(d,[tagRun(d,project.policy,{font:"Calibri",size:22})],{spacing:{after:40}}));
+   ch.push(tagP(d,[tagRun(d,"Disclaimer:",{font:"Calibri",size:22,bold:true})],{spacing:{after:0}}));
+   ch.push(tagP(d,[tagRun(d,project.disclaimer,{font:"Calibri",size:22})],{spacing:{after:100}}));
+   ch.push(tagSectionBox(d,"Challenge Course Description",project.course));
+   ch.push(tagP(d,"",{spacing:{after:90}}));
+   ch.push(tagSectionBox(d,"Description of Testing Procedure",project.procedure));
+   ch.push(tagP(d,"",{spacing:{after:100}}));
+   ch.push(tagBar(d,"Testing Ratings and Comments:",false));
+   var ratings=[["Pass:",project.pass],["Fail:",project.fail],["Not Inspected (NI):",project.ni]];
+   ratings.forEach(function(pair){
+    ch.push(tagP(d,[tagRun(d,pair[0]+" ",{size:20,bold:true}),tagRun(d,pair[1],{size:20})],
+     {bullet:{indent:600},spacing:{after:45}}));
+   });
+   // The source document begins the plan/anchor summary on a new page.
+   ch.push(tagP(d,"",{pageBreakBefore:true,spacing:{after:0}}));
+   if(S.planImage){
+    var planWidth=Math.min(580,Math.round(275/Math.max(.01,S.planImage.ratio)));
+    ch.push(tagP(d,[new d.ImageRun({type:S.planImage.type==="image/png"?"png":"jpg",
+     data:S.planImage.bytes,transformation:{width:planWidth,height:Math.round(planWidth*S.planImage.ratio)}})],
+     {alignment:d.AlignmentType.CENTER,spacing:{after:75}}));
+   }
+   ch.push(tagBar(d,"Anchors",false));
+   ch.push(tagTable(d,wordAnchorRows(tests),[3450,975,1400,2650,885],{
+    headingRows:1,centerHeading:true,fontSize:20
+   }));
   }
-  ch.push(docxTable(d,[["Anchor # and Location","Applied Load","Measuring Device","Test ID"]].concat(tests.map(function(t){
-   return [t.title||("Anchor "+t.anchor),Math.round(t.peak).toLocaleString()+" lb peak",project.model+" / "+project.serial,t.id];
-  }))));
-  }
+  // Preserve the existing 2/3-graph export layout and all editable notes.
   var per=project.graphsPerPage===3?3:2;
   tests.forEach(function(t,i){
    var img=images[i];
    ch.push(paragraph(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{
-    heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0&&(i>0||complete),spacing:{before:100,after:45}
+    heading:d.HeadingLevel.HEADING_2,pageBreakBefore:i%per===0&&(i>0||complete),
+    spacing:{before:100,after:45}
    }));
-   // Graph starts directly after its title; no metadata paragraph between them.
    var w=490,h=per===3?159:184;
    ch.push(new d.Paragraph({children:[new d.ImageRun({type:"png",data:dataBytes(img),transformation:{width:w,height:h}})],spacing:{after:70}}));
    if(t.peak>crosbyView(t).ymax)
     ch.push(paragraph(d,"Peak exceeds displayed Y-axis; inspect original recorded readings.",{spacing:{after:45}}));
    if(t.comments)ch.push(paragraph(d,"Comments: "+t.comments,{spacing:{after:65}}));
   });
-  var footer=new d.Footer({children:[paragraph(d,"The Adventure Guild  |  Inspection Documentation Report",{alignment:d.AlignmentType.CENTER})]});
-  var document=new d.Document({creator:"The Adventure Guild",title:"Ground Anchor Testing — "+project.client,
-   styles:{default:{document:{run:{font:"Arial",size:19},paragraph:{spacing:{after:65}}}}},
-   sections:[{properties:{page:{size:{width:12240,height:15840},margin:{top:670,bottom:650,left:760,right:760}}},footers:{default:footer},children:ch}]
+  var footer=new d.Footer({children:[tagP(d,[
+   tagRun(d,"The Adventure Guild      Inspection Documentation Report",{size:24})
+  ],{alignment:d.AlignmentType.CENTER})]});
+  var document=new d.Document({
+   creator:"The Adventure Guild",title:"Ground Anchor Testing — "+project.client,
+   styles:{default:{document:{run:{font:"Arial",size:20,color:"000000"},paragraph:{spacing:{after:0}}}}},
+   sections:[{properties:{page:{size:{width:12240,height:15840},
+    margin:{top:1000,bottom:1440,left:1440,right:1440,footer:430}}},
+    footers:{default:footer},children:ch}]
   });
   var blob=await d.Packer.toBlob(document);
   download(blob,fileStem()+(complete?"_complete":"_graphs")+".docx");
