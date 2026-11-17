@@ -122,10 +122,10 @@
 #csWorkflow .cs-axis-bounds label>span{position:absolute;right:0;top:0;font-size:10px;color:#93adb8}
 #csWorkflow .cs-axis-bounds input[type=number]{display:block;width:100%;min-width:0;padding:6px 6px;margin-top:3px;font-size:13px;font-variant-numeric:tabular-nums}
 #csWorkflow .cs-pad-help{margin:10px 0 0;line-height:1.4}
-#csWorkflow .cs-inspector-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
-#csWorkflow .cs-inspector-options>details.cs-advanced{min-width:0;margin:10px 0 0;padding:9px}
+#csWorkflow .cs-inspector-options{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;align-items:start}
+#csWorkflow .cs-inspector-options>details.cs-advanced{min-width:0;width:100%;margin:0;padding:10px}
 #csWorkflow .cs-inspector-options>details.cs-advanced>summary{font-size:12px}
-#csWorkflow .cs-inspector-options>details.cs-advanced[open]{grid-column:1 / -1}
+#csWorkflow .cs-inspector-options>details.cs-advanced[open]{grid-column:auto}
 #csWorkflow .cs-inspector-options .cs-fill-row{grid-template-columns:minmax(110px,1fr) 65px 105px;gap:8px}
 #csWorkflow .cs-inspector-options .cs-fill-row label.cs-check{font-size:12px}
 #csWorkflow .cs-inspector-options .cs-edit{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
