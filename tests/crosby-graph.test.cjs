@@ -108,10 +108,11 @@ function snap(h) {
 }
 function markerTimes(t) { return [t.style.a, t.style.b]; }
 function setTimes(t, a, b) { t.style.a = a; t.style.b = b; }
-function drag(h, key, destination) {
+function drag(h, key, destination, options = {}) {
   const canvas = h.get('csCanvas');
   const valueToPixel = h.S.chart.scales.x.getPixelForValue;
-  const base = { pointerId: 1, pointerType: 'mouse', button: 0, clientY: 50 };
+  const base = { pointerId: 1, pointerType: 'mouse', button: 0, clientY: 50,
+    altKey: !!options.altKey };
   canvas.emit('pointerdown', { ...base, clientX: valueToPixel(h.S.tests[0].style[key]) });
   canvas.emit('pointermove', { ...base, clientX: valueToPixel(destination) });
   canvas.emit('pointerup', { ...base, clientX: valueToPixel(destination) });
@@ -452,14 +453,62 @@ test('A–B statistics show 0.02 and 0.001 seconds rather than rounding them awa
   }
 });
 
-test('pointer dragging keeps fractional seconds and clamps only to recording bounds', () => {
+test('A and B snap continuously to nearest 1 Hz readings before mouse release', () => {
+  const h=load(),t=select(h,recording(h,{
+    points:Array.from({length:11},(_,x)=>({x,y:3100})),
+    duration:10,view:{xmin:0,xmax:10,ymin:0,ymax:4000}
+  }));
+  setTimes(t,2,8);h.refresh();
+  const chart=h.S.chart,canvas=h.get('csCanvas'),px=chart.scales.x.getPixelForValue;
+  const p={pointerId:17,pointerType:'mouse',button:0,clientY:50,altKey:false};
+  canvas.emit('pointerdown',{...p,clientX:px(2)});
+  canvas.emit('pointermove',{...p,clientX:px(3.2)});
+  assert.equal(t.style.a,3,'A should show 3 seconds during the drag');
+  assert.equal(Number(h.get('csMarkerA').value),3,'Marker input should update live');
+  canvas.emit('pointermove',{...p,clientX:px(3.8)});
+  assert.equal(t.style.a,4,'A should jump to 4 seconds as cursor crosses midpoint');
+  canvas.emit('pointermove',{...p,clientX:px(4.5)});
+  assert.equal(t.style.a,4,'Halfway ties choose the earlier measured second');
+  assert.equal(t.style.b,8,'Dragging A must not move B');
+  canvas.emit('pointerup',{...p,clientX:px(4.5)});
+  assert.equal(t.style.a,4,'Release should not cause a second jump');
+  assert.deepEqual(plain(t.view),{xmin:0,xmax:10,ymin:0,ymax:4000});
+  const q={...p,pointerId:18};
+  canvas.emit('pointerdown',{...q,clientX:px(8)});
+  canvas.emit('pointermove',{...q,clientX:px(6.65)});
+  assert.equal(t.style.b,7,'B should snap live to its nearest second');
+  assert.equal(Number(h.get('csMarkerB').value),7,'B input should reflect the live position');
+  canvas.emit('pointerup',{...q,clientX:px(6.65)});
+  assert.equal(t.style.b,7);
+  assert.equal(t.markerManual,true);
+});
+
+test('Alt/Option temporarily disables live snapping without disabling typing', () => {
+  const h=load(),t=select(h,recording(h,{
+    points:Array.from({length:11},(_,x)=>({x,y:3100})),
+    duration:10,view:{xmin:0,xmax:10,ymin:0,ymax:4000}
+  }));
+  setTimes(t,2,8);h.refresh();
+  const c=h.get('csCanvas'),px=h.S.chart.scales.x.getPixelForValue;
+  const mouse={pointerId:19,pointerType:'mouse',button:0,clientY:50};
+  c.emit('pointerdown',{...mouse,clientX:px(2)});
+  c.emit('pointermove',{...mouse,clientX:px(3.45),altKey:true});
+  assert.ok(Math.abs(t.style.a-3.45)<1e-12,'Holding Alt should place A freely while moving');
+  c.emit('pointerup',{...mouse,clientX:px(3.45),altKey:true});
+  assert.ok(Math.abs(t.style.a-3.45)<1e-12,'Alt precision should survive release');
+  const input=h.get('csMarkerA');input.value='2.123456789';
+  input.emit('input',{target:input});
+  assert.equal(t.style.a,2.123456789,'Typed marker values should retain full precision');
+});
+
+test('Alt-dragging keeps fractional seconds and clamps only to recording bounds', () => {
   const h = load(), t = select(h, recording(h, { duration: 10 }));
   setTimes(t, 2, 8); h.refresh();
-  drag(h, 'a', 2.123456789);
+  drag(h, 'a', 2.123456789, { altKey: true });
   assert.ok(Math.abs(t.style.a - 2.123456789) < 1e-12, `Fraction was changed to ${t.style.a}`);
   assert.equal(Number(h.get('csMarkerA').value), t.style.a);
-  drag(h, 'a', -1); assert.equal(t.style.a, 0);
-  drag(h, 'b', 11); assert.equal(t.style.b, 10);
+  drag(h, 'a', -1, { altKey: true }); assert.equal(t.style.a, 0);
+  drag(h, 'b', 11, { altKey: true }); assert.equal(t.style.b, 10);
 });
 
 test('marker fields accept arbitrary fractions; Reset A/B restores detected hold', () => {
@@ -481,7 +530,7 @@ test('marker fields accept arbitrary fractions; Reset A/B restores detected hold
   assert.equal(t.style.showB,true);
 });
 
-test('dragging close to recorded timestamps snaps, but arbitrary fractional times remain possible', () => {
+test('ordinary dragging snaps to recorded timestamps; Alt permits precise fractional times', () => {
   const h=load(),t=select(h,recording(h,{
     points:Array.from({length:11},(_,x)=>({x,y:3000})),
     duration:10,
@@ -490,13 +539,13 @@ test('dragging close to recorded timestamps snaps, but arbitrary fractional time
   setTimes(t,2,8);h.refresh();
   drag(h,'a',4.04);
   assert.equal(t.style.a,4,'Drop 0.04 seconds from a sample should snap to measured reading');
-  drag(h,'a',4.123456789);
+  drag(h,'a',4.123456789,{altKey:true});
   assert.ok(Math.abs(t.style.a-4.123456789)<1e-12,'Off-sample fractional placement must remain precise');
   assert.equal(Number(h.get('csMarkerA').value),t.style.a);
   assert.equal(t.style.b,8,'Dragging A must not move B');
 });
 
-test('snap-on-drop preserves fractional recorded sample times', () => {
+test('live dragging snaps to actual fractional recorded sample times', () => {
   const h=load(),t=select(h,recording(h,{
     points:[0,0.125,0.375,1].map(x=>({x,y:3100})),
     duration:1,
@@ -602,7 +651,7 @@ test('markers remain freely draggable after a one-time Snap action', () => {
     view: { xmin: 0, xmax: 10, ymin: 0, ymax: 4000 }
   }));
   setTimes(t, 2.2, 7.8); snap(h);
-  drag(h, 'a', 4.123456789);
+  drag(h, 'a', 4.123456789, { altKey: true });
   assert.ok(Math.abs(t.style.a - 4.123456789) < 1e-12);
   assert.equal(t.style.b, 8);
   assert.deepEqual(plain(t.view), { xmin: 0, xmax: 10, ymin: 0, ymax: 4000 });
