@@ -3,7 +3,7 @@
    Distinct from LineScale processing. Local CSV import; no uploads. */
 (function(){
 "use strict";
-var S={tests:[],current:0,chart:null,drag:null,planImage:null,gesture:null,pointers:new Map()};
+var S={tests:[],current:0,chart:null,drag:null,planImage:null,gesture:null,pointers:new Map(),demoSequence:0};
 var $=function(id){return document.getElementById(id);};
 var template=function(){return {a:0,b:10,showA:true,showB:true,band:true,bandColor:"#D2B48C",bandAlpha:.25,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
 var project={
@@ -949,24 +949,62 @@ async function exportWord(content){
  }catch(e){console.error(e);status("Word export failed: "+e.message,true);return false;}
 }
 function example(){
- var lines=["Start Shift, Finish Shift","12-November-2026 08:00:00,12-November-2026 08:01:00","Start Shift, Datalog Type, Project Details, Latitude, Longitude, Underload Count, Overload Count, Total Weight","EXAMPLE, timed, csl, 0,0,0,0,3100","Device, Log Date, Time, Value, Unit, Underloaded, Overloaded"];
- // A 1 Hz illustrative load test: 11 s near 25 lb, a gradually increasing
- // pull that eases toward 3,100 lb, a stable 13 s qualifying hold, a brisk
- // smooth release to almost zero, then several low-load readings.
+ if(S.tests.length>=50){status("50-recording limit reached. Clear an import before adding another example.",true);return;}
+ var number=++S.demoSequence;
+ var id=String(number).padStart(3,"0"),rand=Math.random;
+ var lowSeconds=10+Math.floor(rand()*6);         // 10–15 s around 25 lb
+ var riseSeconds=17+Math.floor(rand()*6);        // gradual, slowing ascent
+ var holdSeconds=12+Math.floor(rand()*4);       // measured ≥3,000 lb for 12–15 s
+ var releaseSeconds=4+Math.floor(rand()*3);     // brisk return to low tension
+ var lowLevel=23+4*rand(),holdLevel=3075+50*rand();
+ var phase=number*.65+rand()*2;
  var smoothstep=function(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
- var lastHold=3090+12*Math.sin(12*.7);
- for(var i=0;i<55;i++){
-  var force;
-  if(i<=10)force=25+4*Math.sin(i*.9)+2*Math.cos(i*.46);
-  else if(i<=29)force=25+3075*smoothstep((i-11)/18);
-  else if(i<=41)force=3090+12*Math.sin((i-29)*.7);
-  else if(i<=46)force=20+(lastHold-20)*(1-smoothstep((i-41)/5));
-  else force=20+4*Math.sin((i-46)*.75);
-  lines.push("40554,12-November-2026,08:00:"+String(i).padStart(2,"0")+":00,"+Math.round(force)+",lb,No,No");
+ var lines=["Start Shift, Finish Shift","12-November-2026 08:00:00,12-November-2026 08:02:00",
+  "Start Shift, Datalog Type, Project Details, Latitude, Longitude, Underload Count, Overload Count, Total Weight",
+  "EXAMPLE-"+id+", timed, csl, 0,0,0,0,3100",
+  "Device, Log Date, Time, Value, Unit, Underloaded, Overloaded"];
+ var points=[],firstAbove=null;
+ function sample(second,force){
+  var lbValue=Math.max(0,Math.round(force));
+  points.push(lbValue);
+  if(firstAbove===null&&lbValue>=3000)firstAbove=second;
+  var mm=String(Math.floor(second/60)).padStart(2,"0"),ss=String(second%60).padStart(2,"0");
+  lines.push("40554,12-November-2026,08:"+mm+":"+ss+":00,"+lbValue+",lb,No,No");
  }
- var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
- S.tests.push(t);refresh();
- status("Illustrative example added: 11 seconds near 25 lb, a gradual pull to about 3,100 lb, a 13-second hold, and a quick release. Try Auto Scale.");
+ // Keep the established profile. Only the onset, ramp shape, measurement
+ // noise, hold duration and release timing vary between illustrative graphs.
+ var rampEnd=lowSeconds+riseSeconds;
+ for(var i=0;i<=rampEnd;i++){
+  var force;
+  if(i<lowSeconds)force=lowLevel+3.5*Math.sin(i*.8+phase)+1.5*(rand()-.5);
+  else{
+   var portion=(i-lowSeconds+1)/(riseSeconds+1);
+   var taper=4*portion*(1-portion);
+   force=lowLevel+(holdLevel-lowLevel)*smoothstep(portion)
+    +taper*(8*Math.sin(i*.95+phase)+5*(rand()-.5));
+  }
+  sample(i,force);
+ }
+ // The hold begins when the measured ramp first reaches 3,000 lb.
+ // End it 12–15 seconds later; the next reading always drops below the
+ // criterion, guaranteeing a genuine qualifying continuous 1 Hz hold.
+ var holdEnd=firstAbove+holdSeconds;
+ for(var i=rampEnd+1;i<=holdEnd;i++)
+  sample(i,holdLevel+10*Math.sin((i-rampEnd)*.66+phase)+7*(rand()-.5));
+ var finalHold=points[points.length-1];
+ for(var i=holdEnd+1;i<=holdEnd+releaseSeconds;i++){
+  var fraction=(i-holdEnd)/releaseSeconds;
+  sample(i,lowLevel+(finalHold-lowLevel)*(1-smoothstep(fraction)));
+ }
+ for(var i=holdEnd+releaseSeconds+1;i<=holdEnd+releaseSeconds+8;i++)
+  sample(i,lowLevel+3*Math.sin(i*.8+phase)+2*(rand()-.5));
+ var t=parseCrosby("example-"+id+"-not-real.csv",lines.join("\n"));
+ t.title="Example "+number+" — NOT a test";t.anchor=null;
+ t.demoProfile={lowSeconds:lowSeconds,holdSeconds:holdSeconds,riseSeconds:riseSeconds,
+  releaseSeconds:releaseSeconds};
+ S.tests.push(t);S.current=S.tests.length-1;refresh();
+ status("Illustrative example "+number+" added: "+lowSeconds+" s near 25 lb, a gradual pull to about 3,100 lb, "+
+  holdSeconds+" s above 3,000 lb, then a quick release. All example readings are synthetic, not actual tests.");
 }
 
 function openCompleteReport(){
