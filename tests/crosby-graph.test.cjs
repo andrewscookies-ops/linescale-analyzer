@@ -180,7 +180,7 @@ test('Crosby workflow defaults to graph-only Word and removes PDF and page-count
   assert.equal(h.get('csExportGraphs').disabled,true);
   assert.equal(h.get('csOpenFullReport').disabled,true);
   for(const removed of ['csPerPage','csExportFormat','csExportContent','csExport','csProjectDetails']) {
-    assert.equal(h.get(removed),null,removed+' should not appear on screen');
+    assert.ok(h.get(removed)==null,removed+' should not appear on screen');
   }
   assert.doesNotMatch(source,/async function exportPDF|function renderFullPDFIntro|jsPDF|id="csPerPage"|value="pdf"/);
   assert.match(source,/var per=3;/);
