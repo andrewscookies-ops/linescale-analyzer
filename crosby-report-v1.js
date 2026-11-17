@@ -360,14 +360,26 @@ function crosbyTickStep(viewSpan,chartWidth){
 }
 // Show whole-second labels at normal 1 Hz viewing scales, even if Chart.js
 // proposes fractional ticks. Decimal labels are useful only below 1 second.
-function crosbyTimeTickLabel(value,viewSpan){
+function crosbyTimeTickLabel(value,viewSpan,autoScale){
  var n=Number(value);
  if(!Number.isFinite(n))return "";
  if(viewSpan>=1){
   var nearest=Math.round(n);
-  return Math.abs(n-nearest)<=1e-7?nearest.toLocaleString():"";
+  if(Math.abs(n-nearest)>1e-7)return "";
+  // Auto Scale retains a vertical gridline for every second, while only
+  // labeling the even-numbered seconds to avoid crowding.
+  if(autoScale&&nearest%2!==0)return "";
+  return nearest.toLocaleString();
  }
  return Number(n.toFixed(3)).toLocaleString(undefined,{maximumFractionDigits:3});
+}
+function crosbyXTickSettings(viewSpan,chartWidth,autoScale){
+ var dense=!!autoScale&&viewSpan>=1;
+ var step=dense?1:crosbyTickStep(viewSpan,chartWidth);
+ return {stepSize:step,precision:step>=1?0:3,autoSkip:!dense,
+  // Chart.js uses this limit while generating ticks, not just when hiding labels.
+  // Give the one-second grid room to render every tick in Auto Scale mode.
+  maxTicksLimit:dense?Math.ceil(viewSpan)+3:Math.max(6,Math.floor((chartWidth||720)/52))};
 }
 function crosbySampleSeconds(t){
  var steps=[];
@@ -382,7 +394,7 @@ function crosbySampleSeconds(t){
 function graphConfig(t,widthHint){
  var threshold=Math.max(0,project.minimum),max=Math.max(threshold,t.peak)*1.17,v=crosbyView(t);
  var width=widthHint||$("csCanvas")?.getBoundingClientRect()?.width||720;
- var step=crosbyTickStep(v.xmax-v.xmin,width);
+ var xTicks=crosbyXTickSettings(v.xmax-v.xmin,width,t.autoScaleTicks);
  return {
   type:"line",
   data:{datasets:[
@@ -398,10 +410,7 @@ function graphConfig(t,widthHint){
    responsive:true,maintainAspectRatio:false,animation:false,devicePixelRatio:1,
    onResize:function(chart,size){
     var x=chart.scales?.x;if(!x)return;
-    var step=crosbyTickStep(x.max-x.min,size.width);
-    chart.options.scales.x.ticks.stepSize=step;
-    chart.options.scales.x.ticks.precision=step>=1?0:3;
-    chart.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor(size.width/52));
+    Object.assign(chart.options.scales.x.ticks,crosbyXTickSettings(x.max-x.min,size.width,t.autoScaleTicks));
    },
    parsing:false,normalized:true,
    plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{
@@ -410,8 +419,8 @@ function graphConfig(t,widthHint){
    }}},
    scales:{
     x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},
-      ticks:{color:"#526479",stepSize:step,precision:step>=1?0:3,autoSkip:true,maxTicksLimit:Math.max(6,Math.floor(width/52)),maxRotation:0,
-       callback:function(value){var span=this?.max-this?.min;return crosbyTimeTickLabel(value,Number.isFinite(span)&&span>0?span:v.xmax-v.xmin);}},
+      ticks:Object.assign({color:"#526479",maxRotation:0,
+       callback:function(value){var span=this?.max-this?.min;return crosbyTimeTickLabel(value,Number.isFinite(span)&&span>0?span:v.xmax-v.xmin,t.autoScaleTicks);}},xTicks),
       grid:{color:"#e4e8ec"}},
     y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",precision:0,callback:function(v){return Number.isInteger(Number(v))?Number(v).toLocaleString():"";}},grid:{color:"#dfe5e9"}}
    }
@@ -442,7 +451,7 @@ function draw(){
  // Initial render must follow exactly the same axis/tick update path as
  // Reset / Fit. Each imported graph starts with fitCrosbyView(t), while
  // manually edited/saved views remain intact on later previews.
- setCrosbyView(crosbyView(t));
+ setCrosbyView(crosbyView(t),"preserve");
 }
 function renderRows(){
  var host=$("csRows");if(!host)return;
@@ -586,14 +595,15 @@ function crosbyPan(v,dx,dy){
  var h=v.ymax-v.ymin;n.ymin+=dy*h;n.ymax+=dy*h;
  return n;
 }
-function setCrosbyView(v){
+function setCrosbyView(v,mode){
  var t=selected(),ch=S.chart;if(!t||!ch)return;
+ // Only an explicit Auto Scale click enables one-second gridlines with
+ // two-second labels. Redrawing the same recording preserves that choice;
+ // other navigation/zoom actions restore the normal graph tick behavior.
+ if(mode!=="preserve")t.autoScaleTicks=mode==="autoscale";
  t.view=v;
  ch.options.scales.x.min=v.xmin;ch.options.scales.x.max=v.xmax;
- var step=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
- ch.options.scales.x.ticks.stepSize=step;
- ch.options.scales.x.ticks.precision=step>=1?0:3;
- ch.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor((ch.chartArea?.width||720)/52));
+ Object.assign(ch.options.scales.x.ticks,crosbyXTickSettings(v.xmax-v.xmin,ch.chartArea?.width||720,t.autoScaleTicks));
  ch.options.scales.y.min=v.ymin;ch.options.scales.y.max=v.ymax;ch.update("none");
  syncCrosbyAxisInputs(t);
 }
@@ -603,7 +613,7 @@ function crosbyAction(action){
  if(action==="autoscale"){
   var view=autoScaleCrosbyView(t);
   if(!view){status("Show A and B markers to use Auto Scale.",true);return;}
-  setCrosbyView(view);return;
+  setCrosbyView(view,"autoscale");return;
  }
  if(action==="focus"){setCrosbyView(focusCrosbyView(t));return;}
  var v=crosbyView(t);
