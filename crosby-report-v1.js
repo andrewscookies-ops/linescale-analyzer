@@ -925,13 +925,13 @@ function example(){
  // This makes the default full view visibly different from Auto Scale, which
  // focuses around the automatically identified qualifying hold.
  for(var i=0;i<46;i++){
+  // Smoothstep release starts at 33 s, without a sharp corner at 34–35 s.
+  var release=Math.min(1,Math.max(0,(i-33)/12));
+  var releaseFraction=release*release*(3-2*release);
   var force=i<10?30+18*Math.sin(i*1.1):
    i<20?40+(i-10)*310:
    i<=33?3060+45*Math.sin((i-20)/3):
-   // Ease smoothly out of the 33-second hold: no sharp peak at 34 s.
-   // This cubic has zero slope at both ends of the 33–45 s release.
-   Math.max(0,(3060+45*Math.sin(13/3))*
-    (1-(function(u){return u*u*(3-2*u);})((i-33)/12)));
+   Math.max(0,(3060+45*Math.sin(13/3))*(1-releaseFraction));
   lines.push("40554,12-November-2026,08:00:"+String(i).padStart(2,"0")+":00,"+Math.round(force)+",lb,No,No");
  }
  var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
