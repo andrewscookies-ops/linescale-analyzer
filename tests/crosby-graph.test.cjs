@@ -446,6 +446,16 @@ test('sample recording provides ten measured 10–50 lb seconds before the pull'
     'All pre-pull tension samples must be within 10–50 lb');
   assert.ok(t.points.slice(11,20).some(p=>p.y>=500),
     'The pull should begin after the initial low-tension period');
+  const pull=t.points;
+  assert.ok(pull[10].y-pull[9].y<50,
+    'The low-tension lead-in should flow gently into the pull at 10 s');
+  assert.ok(pull[11].y>pull[10].y&&pull[12].y>pull[11].y&&pull[13].y>pull[12].y,
+    'The first three seconds of pulling must rise smoothly');
+  assert.ok(pull[11].y-pull[10].y<240,
+    'The initial pull should ease in rather than jump immediately to 310 lb/s');
+  assert.equal(pull[13].y,970,'The eased pull should meet the original straight ramp at 13 s');
+  assert.equal(pull[14].y-pull[13].y,310,
+    'After easing, the pull should resume the normal ramp speed');
   const y33=t.points[33].y,y34=t.points[34].y,y35=t.points[35].y;
   assert.ok(y33>y34&&y34>y35,
     'Example must begin a continuous decline through 33, 34 and 35 seconds');
