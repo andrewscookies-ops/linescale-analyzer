@@ -153,6 +153,9 @@ function install(){
  '<div class="cs-marker-actions"><button type="button" id="csWindow" title="Restore the automatically detected A/B hold without changing zoom or axes">↺ Reset A/B</button></div>',
  '</div>',
  '<aside class="cs-graph-inspector" aria-label="Graph view and shading settings">',
+
+ '<div class="cs-inspector-options">',
+ '<details class="cs-advanced"><summary>Advanced controls</summary>',
  '<section class="cs-axis-controller" aria-labelledby="csAxisHeading">',
  '<div class="cs-axis-title"><strong id="csAxisHeading">Graph view</strong><span>Tap arrows or edit bounds</span></div>',
  '<div class="cs-axis-row">',
@@ -169,8 +172,6 @@ function install(){
  '</div></div>',
  '<p class="cs-mini cs-pad-help">Arrows shift the view by 10% of its current span. X-axis uses 1-second marks by default and adjusts with zoom.</p>',
  '</section>',
- '<div class="cs-inspector-options">',
- '<details class="cs-advanced"><summary>Advanced controls</summary>',
  '<div class="cs-toolbar"><label>Wheel/pinch axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label></div>',
  '<p class="cs-muted">Auto Scale shows 10 seconds around A/B at 0–4,000 lb. Reset / Fit shows the full recording; neither moves the markers.</p>',
  '<div class="cs-toolbar"><button type="button" id="csPng">Save graph as PNG</button></div>',
