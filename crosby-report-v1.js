@@ -358,6 +358,17 @@ function crosbyTickStep(viewSpan,chartWidth){
  for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-9)return steps[i];
  return Math.ceil(desired/1200)*1200;
 }
+// Show whole-second labels at normal 1 Hz viewing scales, even if Chart.js
+// proposes fractional ticks. Decimal labels are useful only below 1 second.
+function crosbyTimeTickLabel(value,viewSpan){
+ var n=Number(value);
+ if(!Number.isFinite(n))return "";
+ if(viewSpan>=1){
+  var nearest=Math.round(n);
+  return Math.abs(n-nearest)<=1e-7?nearest.toLocaleString():"";
+ }
+ return Number(n.toFixed(3)).toLocaleString(undefined,{maximumFractionDigits:3});
+}
 function crosbySampleSeconds(t){
  var steps=[];
  for(var i=1;i<t.points.length;i++){
@@ -387,7 +398,9 @@ function graphConfig(t,widthHint){
    responsive:true,maintainAspectRatio:false,animation:false,devicePixelRatio:1,
    onResize:function(chart,size){
     var x=chart.scales?.x;if(!x)return;
-    chart.options.scales.x.ticks.stepSize=crosbyTickStep(x.max-x.min,size.width);
+    var step=crosbyTickStep(x.max-x.min,size.width);
+    chart.options.scales.x.ticks.stepSize=step;
+    chart.options.scales.x.ticks.precision=step>=1?0:3;
     chart.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor(size.width/52));
    },
    parsing:false,normalized:true,
@@ -397,10 +410,10 @@ function graphConfig(t,widthHint){
    }}},
    scales:{
     x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},
-      ticks:{color:"#526479",stepSize:step,autoSkip:true,maxTicksLimit:Math.max(6,Math.floor(width/52)),maxRotation:0,
-       callback:function(value){return Number(value).toLocaleString(undefined,{maximumFractionDigits:2});}},
+      ticks:{color:"#526479",stepSize:step,precision:step>=1?0:3,autoSkip:true,maxTicksLimit:Math.max(6,Math.floor(width/52)),maxRotation:0,
+       callback:function(value){var span=this?.max-this?.min;return crosbyTimeTickLabel(value,Number.isFinite(span)&&span>0?span:v.xmax-v.xmin);}},
       grid:{color:"#e4e8ec"}},
-    y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",callback:function(v){return Number(v).toLocaleString();}},grid:{color:"#dfe5e9"}}
+    y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",precision:0,callback:function(v){return Number.isInteger(Number(v))?Number(v).toLocaleString():"";}},grid:{color:"#dfe5e9"}}
    }
   }
  };
@@ -577,7 +590,9 @@ function setCrosbyView(v){
  var t=selected(),ch=S.chart;if(!t||!ch)return;
  t.view=v;
  ch.options.scales.x.min=v.xmin;ch.options.scales.x.max=v.xmax;
- ch.options.scales.x.ticks.stepSize=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
+ var step=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
+ ch.options.scales.x.ticks.stepSize=step;
+ ch.options.scales.x.ticks.precision=step>=1?0:3;
  ch.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor((ch.chartArea?.width||720)/52));
  ch.options.scales.y.min=v.ymin;ch.options.scales.y.max=v.ymax;ch.update("none");
  syncCrosbyAxisInputs(t);
