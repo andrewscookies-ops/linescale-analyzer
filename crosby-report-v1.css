@@ -111,7 +111,6 @@
 #csWorkflow .cs-axis-controller{background:#13232d;border:1px solid #355061;border-radius:10px;padding:12px}
 #csWorkflow .cs-axis-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 #csWorkflow .cs-axis-title strong{font-size:13px;color:#d9ecea}
-#csWorkflow .cs-axis-title span{font-size:10px;color:#9bb4bf}
 #csWorkflow .cs-axis-row{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:center}
 #csWorkflow .cs-dpad{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(3,32px);gap:3px;justify-content:center;align-items:center}
 #csWorkflow .cs-dpad button{width:32px;height:32px;min-width:0;padding:0;display:grid;place-items:center;font-size:19px;font-weight:700;background:#1b333c;border-color:#466170;line-height:1}
@@ -121,7 +120,6 @@
 #csWorkflow .cs-axis-bounds label{font-size:11px;position:relative;min-width:0}
 #csWorkflow .cs-axis-bounds label>span{position:absolute;right:0;top:0;font-size:10px;color:#93adb8}
 #csWorkflow .cs-axis-bounds input[type=number]{display:block;width:100%;min-width:0;padding:6px 6px;margin-top:3px;font-size:13px;font-variant-numeric:tabular-nums}
-#csWorkflow .cs-pad-help{margin:10px 0 0;line-height:1.4}
 #csWorkflow .cs-inspector-options{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;align-items:start}
 #csWorkflow .cs-inspector-options>details.cs-advanced{min-width:0;width:100%;margin:0;padding:10px}
 #csWorkflow .cs-inspector-options>details.cs-advanced>summary{font-size:12px}
