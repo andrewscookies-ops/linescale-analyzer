@@ -424,7 +424,7 @@ test('sample recording provides ten measured 10–50 lb seconds before the pull'
   const t=h.S.tests[0];
   assert.ok(t&&t.title.includes('NOT a test'));
   assert.equal(t.points.length,46);
-  assert.deepEqual(t.points.slice(0,10).map(p=>p.x),[0,1,2,3,4,5,6,7,8,9]);
+  assert.deepEqual(plain(t.points.slice(0,10).map(p=>p.x)),[0,1,2,3,4,5,6,7,8,9]);
   assert.ok(t.points.slice(0,10).every(p=>p.y>=10&&p.y<=50),
     'All pre-pull tension samples must be within 10–50 lb');
   assert.ok(t.points.slice(11,20).some(p=>p.y>=500),
