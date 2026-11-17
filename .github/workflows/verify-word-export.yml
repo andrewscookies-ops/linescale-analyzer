@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'crosby-report-v1.js'
+      - 'tag-workflow-switch-v1.js'
+      - 'tests/workflow-switch.test.cjs'
       - 'crosby-report-v1.css'
       - 'assets/tag-logo.base64'
       - 'tests/word-export.integration.cjs'
@@ -20,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Install exact Word export library
         run: npm install --no-save --package-lock=false docx@9.5.1
+      - name: Workflow switcher regression suite
+        run: node tests/workflow-switch.test.cjs
       - name: Existing Crosby regression suite
         run: node tests/crosby-graph.test.cjs
       - name: Generate real DOCX using app exporter
