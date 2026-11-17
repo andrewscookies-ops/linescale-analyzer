@@ -5,7 +5,7 @@
 "use strict";
 var S={tests:[],current:0,chart:null,drag:null,planImage:null,axis:'both',gesture:null,pointers:new Map()};
 var $=function(id){return document.getElementById(id);};
-var template=function(){return {a:0,b:10,showA:true,showB:true,band:true,bandColor:"#D2B48C",bandAlpha:.24,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
+var template=function(){return {a:0,b:10,showA:true,showB:true,band:true,bandColor:"#D2B48C",bandAlpha:.25,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
 var project={
  date:"November 12, 2026",client:"Camp Seneca Lake",location:"",manager:"Rich Petteruti",tester:"Benjamin Browand",
  course:"The new Camp Seneca Lake challenge course is installed on 50-foot utility poles and supported by ground anchors. New course anchors were installed by The Adventure Guild. Existing anchors for the Giant Swing and Zip Line were also tested.",
@@ -165,8 +165,8 @@ function install(){
  '<p class="cs-mini">The minimum-load line is a visual reference, not an independent certification decision.</p>',
  '<details class="cs-advanced"><summary>Save or restore setup</summary><div class="cs-toolbar"><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div></details>',
  '<p class="cs-mini">The original LineScale workflow remains separate below.</p></div>',
- '<dialog id="csFullReportDialog" class="cs-full-report-dialog" aria-labelledby="csFullReportHeading"><h3 id="csFullReportHeading">Complete Word Report</h3>',
- '<p class="cs-muted">Review or edit the project information below. These fields are used only in the complete Word report. Graph-only downloads do not require them.</p>',
+ '<dialog id="csFullReportDialog" class="cs-full-report-dialog" aria-labelledby="csFullReportHeading"><h3 id="csFullReportHeading">Word Report Content</h3>',
+ '<p class="cs-muted">Complete Word Report: review or edit the project information below. These fields are used only in the complete report; graph downloads do not require them.</p>',
  '<div class="cs-fields" id="csProjectFields"></div>',
  '<div class="cs-toolbar"><label>Site plan / diagram (optional)<input id="csPlanFile" type="file" accept="image/png,image/jpeg"></label><span class="cs-muted" id="csPlanName">No diagram selected</span></div>',
  '<p class="cs-status" id="csFullReportStatus" role="status" aria-live="polite"></p>',
@@ -810,7 +810,7 @@ async function exportWord(content){
    ch.push(tagP(d,[tagRun(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{font:"Arial",size:22,bold:true})],{
     pageBreakBefore:i%per===0&&(i>0||complete),spacing:{before:100,after:45}
    }));
-   var w=490,h=per===3?159:184;
+   var w=490,h=159;
    ch.push(new d.Paragraph({children:[new d.ImageRun({type:"png",data:dataBytes(img),transformation:{width:w,height:h}})],spacing:{after:70}}));
    if(t.peak>crosbyView(t).ymax)
     ch.push(paragraph(d,"Peak exceeds displayed Y-axis; inspect original recorded readings.",{spacing:{after:45}}));
