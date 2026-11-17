@@ -208,6 +208,38 @@ test('initial imported view is identical to Reset / Fit with marker positions un
   assert.deepEqual(plain(t.style),markerBefore,'Reset / Fit must not touch A/B');
 });
 
+test('first chart render and Reset / Fit produce identical axes, tick spacing, and graph state', () => {
+  const cases=[
+    {name:'short.csv',readings:[
+      ['08:00:00:000',0],['08:00:01:000',3100],['08:00:02:000',3250],
+      ['08:00:03:000',3150],['08:00:08:000',0]],duration:8},
+    {name:'normal.csv',readings:[
+      ['08:00:00:000',0],['08:00:10:000',3100],['08:00:12:000',4200],
+      ['08:02:00:000',0]],duration:120},
+    {name:'long.csv',readings:[
+      ['08:00:00:000',0],['08:00:10:000',3100],['08:00:12:000',4600],
+      ['08:10:00:000',0]],duration:600}
+  ];
+  for(const item of cases){
+    const h=load(),t=h.parseCrosby(item.name,csv(item.readings));
+    select(h,t);
+    const state=()=>plain({
+      view:t.view,
+      x:h.S.chart.options.scales.x,
+      y:h.S.chart.options.scales.y,
+      marker:t.style,
+      inputBounds:['csXStart','csXEnd','csYMin','csYMax'].map(id=>Number(h.get(id).value))
+    });
+    const first=state();
+    assert.deepEqual(first.view,{xmin:0,xmax:item.duration,ymin:0,ymax:4000});
+    assert.deepEqual(first.inputBounds,[0,item.duration,0,4000]);
+    assert.equal(first.x.ticks.stepSize,item.duration>120?30:1);
+    h.crosbyAction('reset');
+    const reset=state();
+    assert.deepEqual(reset,first,item.name+' must look identical before and after Reset / Fit');
+  }
+});
+
 test('Advanced Controls and Shading Options stack vertically at the right of the graph', () => {
   const css=fs.readFileSync(`${__dirname}/../crosby-report-v1.css`,'utf8');
   assert.ok(css.includes('.cs-graph-workspace{'), 'Graph and inspector must share a workspace');
