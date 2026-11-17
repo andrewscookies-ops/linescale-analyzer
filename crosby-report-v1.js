@@ -190,9 +190,7 @@ function install(){
  '</div></div>',
  '<div class="cs-panel cs-download-panel"><h3>3 · Download</h3><p class="cs-muted">The default download includes only the selected graphs, three per page, in an editable Word document.</p>',
  '<div class="cs-export-actions"><button type="button" class="cs-primary cs-download-main" id="csExportGraphs">Download Graphs (Word)</button><button type="button" id="csOpenFullReport">Complete Word Report…</button></div>',
- '<p class="cs-mini">The minimum-load line is a visual reference, not an independent certification decision.</p>',
- '<details class="cs-advanced"><summary>Save or restore setup</summary><div class="cs-toolbar"><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div></details>',
- '<p class="cs-mini">The original LineScale workflow remains separate below.</p></div>',
+ '</div>',
  '<dialog id="csFullReportDialog" class="cs-full-report-dialog" aria-labelledby="csFullReportHeading"><h3 id="csFullReportHeading">Word Report Content</h3>',
  '<p class="cs-muted">Complete Word Report: review or edit the project information below. These fields are used only in the complete report; graph downloads do not require them.</p>',
  '<div class="cs-fields" id="csProjectFields"></div>',
@@ -705,35 +703,6 @@ function download(blob,name){
  setTimeout(function(){URL.revokeObjectURL(url);},120000);
 }
 function fileStem(){return safeName(project.client||"TAG-Anchor-Testing")+"_"+safeName(project.date||"report");}
-function savePreset(){
- download(new Blob([JSON.stringify({schema:"tag-crosby-report-v1",...reportData()},null,2)],{type:"application/json"}),fileStem()+"_setup.json");
-}
-async function loadPreset(file){
- if(!file)return;
- try{
-  var obj=JSON.parse(await file.text());
-  if(obj.schema!=="tag-crosby-report-v1"||!obj.project)throw Error("Not a TAG Crosby setup file");
-  Object.keys(project).forEach(function(k){if(Object.prototype.hasOwnProperty.call(obj.project,k))project[k]=obj.project[k];});
-  fieldMap.forEach(function(f){setControl("csField_"+f[0],project[f[0]]||"");});
-  setControl("csTarget",project.minimum);setControl("csHold",project.hold);
-  (obj.tests||[]).forEach(function(saved){
-   var current=S.tests.find(function(t){return t.id===saved.id&&t.name===saved.name;})||S.tests.find(function(t){return t.id===saved.id;});
-   if(!current)return;
-   ["anchor","title","rating","comments","enabled"].forEach(function(k){if(k in saved)current[k]=saved[k];});
-   if(saved.style){
-    current.style=Object.assign(template(),saved.style);
-    // Old setup formats predate markerManual: preserve their saved positions.
-    current.markerManual=typeof saved.markerManual==="boolean"?saved.markerManual:true;
-    if(!current.markerManual)placeAutomaticMarkers(current,true);
-   }
-   var v=saved.view;
-   if(v&&["xmin","xmax","ymin","ymax"].every(function(k){return Number.isFinite(v[k]);})&&
-       v.xmax>v.xmin&&v.ymax>v.ymin)
-    current.view={xmin:v.xmin,xmax:v.xmax,ymin:v.ymin,ymax:v.ymax};
-  });
-  refresh();status("Saved setup loaded. Import matching CSVs first to restore their individual mappings and styles.");
- }catch(e){status("Could not load setup: "+e.message,true);}
-}
 function imageDataUrl(buffer,mime){
  var bytes=buffer instanceof Uint8Array?buffer:new Uint8Array(buffer),str="";
  for(var i=0;i<bytes.length;i+=8192)str+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
@@ -1043,9 +1012,6 @@ function bind(){
  $("csOpenFullReport").addEventListener("click",openCompleteReport);
  $("csCancelFullReport").addEventListener("click",closeCompleteReport);
  $("csExportFullReport").addEventListener("click",function(){return downloadWord("complete","csExportFullReport");});
- $("csSavePreset").addEventListener("click",savePreset);
- $("csLoadPreset").addEventListener("click",function(){$("csPresetFile").click();});
- $("csPresetFile").addEventListener("change",function(){loadPreset(this.files?.[0]);this.value="";});
  $("csPlanFile").addEventListener("change",async function(){
   var f=this.files?.[0];if(!f)return;
   try{
