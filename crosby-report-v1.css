@@ -147,3 +147,29 @@
  #csWorkflow .cs-inspector-options{gap:6px}
  #csWorkflow .cs-inspector-options>details.cs-advanced{padding:8px}
 }
+
+
+/* Graph View: paired zoom buttons share the same compact inspector as the D-pad. */
+#csWorkflow .cs-zoom-row{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ margin-top:12px;padding-top:11px;border-top:1px solid #355061;
+}
+#csWorkflow .cs-zoom-label{font-size:12px;font-weight:650;color:#d9ecea}
+#csWorkflow .cs-zoom-buttons{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;
+ padding:3px;min-width:190px;max-width:240px;flex:1;
+ background:#0b1921;border:1px solid #355061;border-radius:9px;
+}
+#csWorkflow .cs-zoom-buttons button{
+ width:100%;min-width:0;min-height:36px;margin:0;
+ padding:6px 9px;border:1px solid transparent;border-radius:6px;
+ background:#1b333c;color:#e4f7f1;font-weight:650;font-size:12px;
+ display:flex;justify-content:center;align-items:center;gap:6px;
+}
+#csWorkflow .cs-zoom-buttons button span{font-size:18px;font-weight:700;line-height:1}
+#csWorkflow .cs-zoom-buttons button:hover:not(:disabled){background:#27514d;border-color:#64c8ac}
+#csWorkflow .cs-zoom-buttons button:focus-visible{outline:2px solid #67e8c4;outline-offset:2px}
+@media(max-width:520px){
+ #csWorkflow .cs-zoom-row{flex-wrap:wrap}
+ #csWorkflow .cs-zoom-buttons{max-width:none}
+}
