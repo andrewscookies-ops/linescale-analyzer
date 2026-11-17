@@ -144,9 +144,10 @@ function install(){
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
  '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">Confirm each anchor assignment and select which tests to include. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
- '<div class="cs-toolbar cs-main-tools"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" data-cs-view="autoscale" title="Show 10 seconds before marker A and after marker B with 0–4,000 lb force scale">Auto Scale</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-graph-workspace">',
  '<div class="cs-plot-column">',
+ // Keep the main graph actions in the same sticky column as the chart.
+ '<div class="cs-toolbar cs-main-tools" role="group" aria-label="Graph navigation and scaling"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" data-cs-view="autoscale" title="Show 10 seconds before marker A and after marker B with 0–4,000 lb force scale">Auto Scale</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
  '<p class="cs-muted cs-gesture-help">A/B markers auto-place on a qualifying hold. Drag a marker to snap live to recorded measurements (typically every second). Hold Alt/Option while dragging for free positioning, or type an exact time. Scroll or pinch to zoom; drag elsewhere to pan.</p>',
 
