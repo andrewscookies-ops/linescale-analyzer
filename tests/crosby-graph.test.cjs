@@ -213,8 +213,9 @@ test('main graph toolbar only shows essential controls and zoom adapts time mark
   assert.match(source,/class="cs-toolbar cs-main-tools"/);
   assert.doesNotMatch(source,/data-cs-view="focus"|data-cs-view="left"|data-cs-view="right"|data-cs-view="up"|data-cs-view="down"/);
   assert.match(source,/<details class="cs-advanced"><summary>Advanced graph controls<\/summary>/);
-  assert.match(source,/id="csSnapMarkers"/);
+  assert.doesNotMatch(source,/id="csSnapMarkers"/);
   assert.match(source,/id="csWindow"/);
+  assert.match(source,/release near a recorded reading to snap precisely/);
   const wide=recording(h,{view:{xmin:0,xmax:120,ymin:0,ymax:4000}});
   const narrow=recording(h,{view:{xmin:10,xmax:10.8,ymin:0,ymax:4000}});
   const wideStep=h.graphConfig(wide,720).options.scales.x.ticks.stepSize;
@@ -306,18 +307,50 @@ test('pointer dragging keeps fractional seconds and clamps only to recording bou
   drag(h, 'b', 11); assert.equal(t.style.b, 10);
 });
 
-test('installed marker controls accept any fraction and the Snap button is bound', () => {
+test('marker fields accept arbitrary fractions; Reset A/B restores detected hold', () => {
   const h = load();
   assert.equal(h.get('csMarkerA').step, 'any');
   assert.equal(h.get('csMarkerB').step, 'any');
-  const button = h.get('csSnapMarkers');
-  assert.ok(button, 'Snap markers button must be installed');
-  assert.equal(button.disabled, true);
-  const t = select(h, recording(h));
-  setTimes(t, 9.6, 12.3);
-  assert.equal(button.disabled, false);
-  button.click();
-  assert.deepEqual(markerTimes(t), [10, 12]);
+  assert.ok(h.get('csWindow'));
+  assert.equal(h.get('csWindow').disabled, true);
+  assert.equal(h.get('csSnapMarkers'), undefined, 'No dedicated Snap button should be present');
+  const points = [{ x:0,y:0 }, ...Array.from({length:12},(_,i)=>({x:i+1,y:3100})), {x:20,y:0}];
+  const t = select(h, recording(h, {points,duration:20}));
+  setTimes(t, 5.3, 6.2);
+  t.markerManual=true;
+  assert.equal(h.get('csWindow').disabled,false);
+  h.get('csWindow').click();
+  assert.deepEqual(markerTimes(t), [1,11]);
+  assert.equal(t.markerManual,false);
+  assert.equal(t.style.showA,true);
+  assert.equal(t.style.showB,true);
+});
+
+test('dragging close to recorded timestamps snaps, but arbitrary fractional times remain possible', () => {
+  const h=load(),t=select(h,recording(h,{
+    points:Array.from({length:11},(_,x)=>({x,y:3000})),
+    duration:10,
+    view:{xmin:0,xmax:10,ymin:0,ymax:4000}
+  }));
+  setTimes(t,2,8);h.refresh();
+  drag(h,'a',4.04);
+  assert.equal(t.style.a,4,'Drop 0.04 seconds from a sample should snap to measured reading');
+  drag(h,'a',4.123456789);
+  assert.ok(Math.abs(t.style.a-4.123456789)<1e-12,'Off-sample fractional placement must remain precise');
+  assert.equal(Number(h.get('csMarkerA').value),t.style.a);
+  assert.equal(t.style.b,8,'Dragging A must not move B');
+});
+
+test('snap-on-drop preserves fractional recorded sample times', () => {
+  const h=load(),t=select(h,recording(h,{
+    points:[0,0.125,0.375,1].map(x=>({x,y:3100})),
+    duration:1,
+    view:{xmin:0,xmax:1,ymin:0,ymax:4000}
+  }));
+  setTimes(t,0.125,0.375);h.refresh();
+  drag(h,'a',0.373);
+  assert.equal(t.style.a,0.375);
+  assert.equal(t.style.b,0.375);
 });
 
 test('Snap safely handles no selected recording and an empty sample list', () => {
