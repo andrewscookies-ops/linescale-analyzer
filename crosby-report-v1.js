@@ -144,10 +144,11 @@ function install(){
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
  '<div class="cs-toolbar cs-main-tools"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" data-cs-view="autoscale" title="Show 10 seconds before marker A and after marker B with 0–4,000 lb force scale">Auto Scale</button><button type="button" data-cs-view="in" aria-label="Zoom in">＋ Zoom</button><button type="button" data-cs-view="out" aria-label="Zoom out">− Zoom</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted cs-gesture-help">Drag A/B markers to adjust the shaded hold window. Scroll or pinch to zoom, and drag the graph to pan. Time markings automatically adjust with zoom.</p>',
+ '<p class="cs-muted cs-gesture-help">A/B markers are placed automatically when a qualifying hold is found. Drag a marker to adjust it; release near a recorded reading to snap precisely to that timestamp. You can also type an exact time. Scroll or pinch to zoom, and drag the graph to pan.</p>',
  '<div class="cs-edit cs-marker-controls"><label><input type="checkbox" id="csShowA" checked> Show A <input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds"> seconds</label><label><input type="checkbox" id="csShowB" checked> Show B <input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds"> seconds</label></div>',
+ '<div class="cs-marker-actions"><button type="button" id="csWindow" title="Return A/B to the first qualifying hold found in the recording">↺ Reset A/B</button></div>',
  '<details class="cs-advanced"><summary>Advanced graph controls</summary>',
- '<div class="cs-toolbar"><button type="button" id="csWindow">Auto-place A/B on qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to measured times</button><label>Zoom and pan axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label></div>',
+ '<div class="cs-toolbar"><label>Zoom and pan axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label></div>',
  '<div class="cs-edit" role="group" aria-label="Crosby X-axis range"><label>X-axis start (seconds)<input id="csXStart" type="number" step="any" placeholder="Start"></label><label>X-axis end (seconds)<input id="csXEnd" type="number" step="any" placeholder="End"></label></div>',
  '<p class="cs-muted">Auto Scale adds up to 10 seconds before A and after B; Reset / Fit shows the complete recording. A/B positions do not move when scaling.</p>',
  '<div class="cs-toolbar"><button type="button" id="csPng">Save current graph as PNG</button></div>',
@@ -415,7 +416,7 @@ function refresh(){
  renderRows();
  if(selected())preview(S.current);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
- ["csExportGraphs","csOpenFullReport","csExportFullReport","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
+ ["csExportGraphs","csOpenFullReport","csExportFullReport","csPng","csStyleAll","csWindow"].forEach(function(id){$(id).disabled=!S.tests.length;});
  var autoBtn=document.querySelector('#csWorkflow [data-cs-view="autoscale"]');
  if(autoBtn)autoBtn.disabled=!S.tests.length;
 }
@@ -442,6 +443,20 @@ function setWindow(){
  var found=placeAutomaticMarkers(t,true);
  t.view=null;loadStyle();draw();
  status(found?"A/B reset to first qualifying "+project.hold+" s hold.":"No continuous "+project.hold+" s hold above "+project.minimum+" lb. Markers hidden for review.",!found);
+}
+// Gentle magnetic snapping only on drag release. This deliberately leaves
+// typed values and non-nearby fractional marker positions unchanged.
+function snapNearbySample(t,value,viewWidth,canvasWidth){
+ if(!t||!t.points?.length||!Number.isFinite(value))return value;
+ var nearest=t.points[0].x,distance=Math.abs(nearest-value);
+ t.points.forEach(function(p){
+  var d=Math.abs(p.x-value),eps=4*Number.EPSILON*Math.max(1,Math.abs(value),Math.abs(nearest),Math.abs(p.x));
+  if(d<distance-eps){nearest=p.x;distance=d;}
+ });
+ var typicalInterval=crosbySampleSeconds(t);
+ var pixelTolerance=6*Math.max(.001,viewWidth)/Math.max(1,canvasWidth||720);
+ var tolerance=typicalInterval===null?pixelTolerance:Math.min(pixelTolerance,typicalInterval*.2);
+ return distance<=tolerance+4*Number.EPSILON*Math.max(1,Math.abs(value))?nearest:value;
 }
 function snapCrosbyMarkers(){
  var t=selected();if(!t||!t.points.length)return;
@@ -561,16 +576,27 @@ function dragBind(){
   var g=S.gesture;
   if(g?.type==="marker"&&S.pointers.size===1){
    var x=ch.scales.x.getValueForPixel(p.x);
-   if(Number.isFinite(x)){t.markerManual=true;t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
+   if(Number.isFinite(x)){g.moved=true;t.markerManual=true;t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
   }else panOrPinch();
   e.preventDefault();
  });
- function end(e){
+ function end(e,type){
+  var g=S.gesture,t=selected(),ch=S.chart;
+  if(type==="pointerup"&&g?.type==="marker"&&g.moved&&S.pointers.size===1&&t&&ch?.scales?.x){
+   var x=ch.scales.x;
+   var exact=snapNearbySample(t,t.style[g.key],x.max-x.min,ch.chartArea?.width||ch.width||720);
+   if(exact!==t.style[g.key]){
+    t.style[g.key]=exact;
+    setControl(g.key==="a"?"csMarkerA":"csMarkerB",exact);
+    ch.update("none");
+    refreshCrosbyStats(t);
+   }
+  }
   S.pointers.delete(e.pointerId);
   if(!S.pointers.size)S.gesture=null;
   else if(S.gesture){S.gesture.type="pan";rebase();}
  }
- ["pointerup","pointercancel","lostpointercapture"].forEach(function(type){c.addEventListener(type,end);});
+ ["pointerup","pointercancel","lostpointercapture"].forEach(function(type){c.addEventListener(type,function(e){end(e,type);});});
  c.addEventListener("wheel",function(e){
   var t=selected(),ch=S.chart;if(!t||!ch?.chartArea)return;
   var p=csPx(e),a=ch.chartArea;if(!csInside(p,a))return;
@@ -894,7 +920,6 @@ function bind(){
  $("csPrevious").addEventListener("click",function(){preview((S.current-1+S.tests.length)%S.tests.length);});
  $("csNext").addEventListener("click",function(){preview((S.current+1)%S.tests.length);});
  $("csWindow").addEventListener("click",setWindow);
- $("csSnapMarkers").addEventListener("click",snapCrosbyMarkers);
  $("csStyleAll").addEventListener("click",copyStyle);
  $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
  ["csXStart","csXEnd"].forEach(function(id){$(id).addEventListener("change",applyCrosbyAxisInputs);});
