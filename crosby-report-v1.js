@@ -441,12 +441,12 @@ function renderRows(){
  }).join("");
  $("csCount").textContent=S.tests.length+" / 50 loaded · "+ordered().length+" included";
 }
-function preview(i){
+function preview(i,forceRedraw){
  if(!S.tests.length)return;
  var next=Math.max(0,Math.min(S.tests.length-1,i));
  // Step 1 View is only a selection action. Reopening the currently displayed
  // recording must not recreate its chart or change any live view/annotations.
- if(next===S.current&&S.chart&&S.chart.$crosby===S.tests[next])return;
+ if(!forceRedraw&&next===S.current&&S.chart&&S.chart.$crosby===S.tests[next])return;
  S.current=next;
  // Each test owns its X/Y window, marker coordinates and shading. Selecting a
  // different test displays that saved state; it never recalculates/reset it.
@@ -456,7 +456,7 @@ function refresh(){
  if(!S.tests.length)S.current=0;
  else S.current=Math.min(S.current,S.tests.length-1);
  renderRows();
- if(selected())preview(S.current);else draw();
+ if(selected())preview(S.current,true);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
  ["csExportGraphs","csOpenFullReport","csExportFullReport","csPng","csStyleAll","csWindow"].forEach(function(id){$(id).disabled=!S.tests.length;});
  var autoBtn=document.querySelector('#csWorkflow [data-cs-view="autoscale"]');
