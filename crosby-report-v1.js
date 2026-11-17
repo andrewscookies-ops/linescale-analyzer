@@ -148,7 +148,7 @@ function install(){
  '<div class="cs-graph-workspace">',
  '<div class="cs-plot-column">',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<p class="cs-muted cs-gesture-help">A/B markers auto-place on a qualifying hold. Drag to adjust, release near a recorded time to snap, or type an exact value. Scroll or pinch to zoom; drag the graph to pan.</p>',
+ '<p class="cs-muted cs-gesture-help">A/B markers auto-place on a qualifying hold. Drag a marker to snap live to recorded measurements (typically every second). Hold Alt/Option while dragging for free positioning, or type an exact time. Scroll or pinch to zoom; drag elsewhere to pan.</p>',
  '<div class="cs-edit cs-marker-controls"><label><input type="checkbox" id="csShowA" checked> Show A <input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds"> seconds</label><label><input type="checkbox" id="csShowB" checked> Show B <input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds"> seconds</label></div>',
  '<div class="cs-marker-actions"><button type="button" id="csWindow" title="Restore the automatically detected A/B hold without changing zoom or axes">↺ Reset A/B</button></div>',
  '</div>',
@@ -487,7 +487,24 @@ function setWindow(){
  loadStyle();draw();
  status(found?"A/B restored to the first qualifying "+project.hold+" s hold.":"No continuous "+project.hold+" s hold above "+project.minimum+" lb. Markers hidden for review.",!found);
 }
-// Gentle magnetic snapping only on drag release. This deliberately leaves
+// Nearest real recorded timestamp for live A/B marker dragging. The CSV data
+// is time-sorted; a binary search stays responsive even on large recordings.
+// On a midpoint tie, favor the earlier sample.
+function nearestCrosbySample(t,value){
+ var points=t?.points;
+ if(!points?.length||!Number.isFinite(value))return value;
+ var lo=0,hi=points.length;
+ while(lo<hi){
+  var mid=Math.floor((lo+hi)/2);
+  if(points[mid].x<value)lo=mid+1;else hi=mid;
+ }
+ if(lo===0)return points[0].x;
+ if(lo===points.length)return points[points.length-1].x;
+ var before=points[lo-1].x,after=points[lo].x;
+ var epsilon=4*Number.EPSILON*Math.max(1,Math.abs(value),Math.abs(before),Math.abs(after));
+ return Math.abs(value-before)<=Math.abs(after-value)+epsilon?before:after;
+}
+// Gentle magnetic snapping on touch/pen release. This deliberately leaves
 // typed values and non-nearby fractional marker positions unchanged.
 function snapNearbySample(t,value,viewWidth,canvasWidth){
  if(!t||!t.points?.length||!Number.isFinite(value))return value;
@@ -632,13 +649,23 @@ function dragBind(){
   var g=S.gesture;
   if(g?.type==="marker"&&S.pointers.size===1){
    var x=ch.scales.x.getValueForPixel(p.x);
-   if(Number.isFinite(x)){g.moved=true;t.markerManual=true;t.style[g.key]=Math.max(0,Math.min(t.duration,x));setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);ch.update("none");refreshCrosbyStats(t);}
+   if(Number.isFinite(x)){
+    g.moved=true;t.markerManual=true;
+    var raw=Math.max(0,Math.min(t.duration,x));
+    // Mouse dragging snaps continuously to the actual 1 Hz (or other)
+    // recorded sample times. Alt/Option permits exact free dragging.
+    g.liveSnap=e.pointerType==="mouse"&&!e.altKey;
+    g.freeDrag=e.pointerType==="mouse"&&!!e.altKey;
+    t.style[g.key]=g.liveSnap?nearestCrosbySample(t,raw):raw;
+    setControl(g.key==="a"?"csMarkerA":"csMarkerB",t.style[g.key]);
+    ch.update("none");refreshCrosbyStats(t);
+   }
   }else panOrPinch();
   e.preventDefault();
  });
  function end(e,type){
   var g=S.gesture,t=selected(),ch=S.chart;
-  if(type==="pointerup"&&g?.type==="marker"&&g.moved&&S.pointers.size===1&&t&&ch?.scales?.x){
+  if(type==="pointerup"&&g?.type==="marker"&&g.moved&&!g.liveSnap&&!g.freeDrag&&S.pointers.size===1&&t&&ch?.scales?.x){
    var x=ch.scales.x;
    var exact=snapNearbySample(t,t.style[g.key],x.max-x.min,ch.chartArea?.width||ch.width||720);
    if(exact!==t.style[g.key]){
