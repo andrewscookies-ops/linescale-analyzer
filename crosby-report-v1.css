@@ -52,3 +52,38 @@
  #csWorkflow .cs-fill-row{grid-template-columns:minmax(125px,1fr) 55px minmax(82px,1fr);gap:7px}
  #csWorkflow .cs-toolbar button,#csWorkflow .cs-export button{flex:1 1 145px}
 }
+
+/* Keep graph editing focused; advanced controls and complete-report fields open on demand. */
+#csWorkflow .cs-test-criteria{max-width:660px}
+#csWorkflow .cs-main-tools{gap:7px}
+#csWorkflow .cs-main-tools button{white-space:nowrap}
+#csWorkflow .cs-gesture-help{margin:8px 0 4px}
+#csWorkflow .cs-marker-controls{grid-template-columns:repeat(2,minmax(0,1fr));max-width:550px}
+#csWorkflow .cs-marker-controls label{font-size:13px}
+#csWorkflow .cs-marker-controls input[type=number]{max-width:125px;display:inline-block;margin:0 5px 0 7px;padding:5px 7px}
+#csWorkflow .cs-marker-controls input[type=checkbox]{margin-right:5px}
+#csWorkflow details.cs-advanced{padding:10px 12px;background:#0d1921;border-color:#293b47;margin:12px 0 0}
+#csWorkflow details.cs-advanced>summary{font-size:12px;font-weight:550;color:#bcd0d8}
+#csWorkflow .cs-download-panel{margin-top:20px}
+#csWorkflow .cs-export-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#csWorkflow .cs-download-main{font-size:17px;min-height:54px;flex:2 1 320px;text-align:center}
+#csWorkflow #csOpenFullReport{flex:1 1 190px;min-height:44px}
+#csWorkflow .cs-full-report-dialog{
+ width:min(900px,calc(100vw - 36px));max-width:900px;max-height:90vh;overflow:auto;
+ padding:24px;border-radius:13px;border:1px solid #526a7a;background:#12202a;
+ color:#f3f7fa;box-shadow:0 24px 75px #000a;
+}
+#csWorkflow .cs-full-report-dialog::backdrop{background:rgba(0,0,0,.72)}
+#csWorkflow .cs-full-report-dialog h3{margin:0 0 6px;font-size:19px}
+#csWorkflow .cs-full-report-dialog .cs-fields{margin:18px 0}
+#csWorkflow .cs-full-report-dialog .cs-export-actions{justify-content:flex-end;margin-top:18px}
+#csWorkflow .cs-full-report-dialog .cs-export-actions button{min-height:43px}
+@media(max-width:700px){
+ #csWorkflow .cs-main-tools{gap:5px}
+ #csWorkflow .cs-main-tools button{flex:1 1 125px}
+ #csWorkflow .cs-marker-controls{grid-template-columns:1fr}
+ #csWorkflow .cs-download-main{flex-basis:100%}
+ #csWorkflow #csOpenFullReport{flex-basis:100%}
+ #csWorkflow .cs-full-report-dialog{padding:14px}
+ #csWorkflow .cs-full-report-dialog .cs-export-actions button{flex:1 1 100%}
+}
