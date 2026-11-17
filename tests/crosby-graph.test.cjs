@@ -371,7 +371,7 @@ test('main graph toolbar only shows essential controls and zoom adapts time mark
   assert.match(source,/<details class="cs-advanced"><summary>Advanced controls<\/summary>/);
   assert.doesNotMatch(source,/id="csSnapMarkers"/);
   assert.match(source,/id="csWindow"/);
-  assert.match(source,/release near a recorded time to snap/);
+  assert.match(source,/Drag a marker to snap live to recorded measurements/);
   const wide=recording(h,{view:{xmin:0,xmax:120,ymin:0,ymax:4000}});
   const narrow=recording(h,{view:{xmin:10,xmax:10.8,ymin:0,ymax:4000}});
   const wideStep=h.graphConfig(wide,720).options.scales.x.ticks.stepSize;
