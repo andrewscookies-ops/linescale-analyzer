@@ -253,6 +253,36 @@ test('Advanced Controls and Shading Options stack vertically at the right of the
   assert.ok(advanced>=0&&shading>advanced, 'Advanced Controls must appear above Shading Options');
 });
 
+test('Show A and Show B are always visible directly below, not inside, Shading Options', () => {
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const shading=source.indexOf('<details class="cs-advanced"><summary>Shading options</summary>');
+  const shadingEnd=source.indexOf(" '</details>',",shading);
+  const below=source.indexOf('<div class="cs-markers-below-shading"',shadingEnd);
+  const showA=source.indexOf('id="csShowA"',below);
+  const showB=source.indexOf('id="csShowB"',below);
+  const resetAB=source.indexOf('id="csWindow"',below);
+  const inspectorEnd=source.indexOf(" '</aside>',",shadingEnd);
+  assert.ok(shading>=0&&shadingEnd>shading&&below>shadingEnd,
+    'A/B controls must be after the closed Shading details, not inside that dropdown');
+  assert.ok(showA>below&&showB>showA&&resetAB>showB&&inspectorEnd>resetAB,
+    'Both marker controls and their Reset A/B action must stay in the inspector');
+  assert.equal((source.match(/id="csShowA"/g)||[]).length,1);
+  assert.equal((source.match(/id="csShowB"/g)||[]).length,1);
+  const css=fs.readFileSync(__dirname+'/../crosby-report-v1.css','utf8');
+  assert.match(css,/\.cs-markers-below-shading/);
+  const h=load(),t=select(h,recording(h));
+  const before=plain(t.view),oldA=t.style.a,oldB=t.style.b;
+  const showAInput=h.get('csShowA'),showBInput=h.get('csShowB');
+  showAInput.checked=false;showAInput.emit('input');
+  assert.equal(t.style.showA,false,'Moved Show A still toggles visibility');
+  showBInput.checked=false;showBInput.emit('input');
+  assert.equal(t.style.showB,false,'Moved Show B still toggles visibility');
+  assert.equal(t.style.a,oldA);
+  assert.equal(t.style.b,oldB);
+  assert.deepEqual(plain(t.view),before,'Moving marker visibility controls does not change the graph view');
+  assert.ok(h.get('csWindow'),'Reset A/B remains available alongside marker controls');
+});
+
 test('Graph View stays collapsed inside Advanced Controls beside Shading Options', () => {
   const source=fs.readFileSync(sourcePath,'utf8');
   const options=source.indexOf('<div class="cs-inspector-options">');
