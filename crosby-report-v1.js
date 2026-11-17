@@ -149,8 +149,7 @@ function install(){
  '<div class="cs-plot-column">',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
  '<p class="cs-muted cs-gesture-help">A/B markers auto-place on a qualifying hold. Drag a marker to snap live to recorded measurements (typically every second). Hold Alt/Option while dragging for free positioning, or type an exact time. Scroll or pinch to zoom; drag elsewhere to pan.</p>',
- '<div class="cs-edit cs-marker-controls"><label><input type="checkbox" id="csShowA" checked> Show A <input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds"> seconds</label><label><input type="checkbox" id="csShowB" checked> Show B <input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds"> seconds</label></div>',
- '<div class="cs-marker-actions"><button type="button" id="csWindow" title="Restore the automatically detected A/B hold without changing zoom or axes">↺ Reset A/B</button></div>',
+
  '</div>',
  '<aside class="cs-graph-inspector" aria-label="Graph view and shading settings">',
 
@@ -185,6 +184,11 @@ function install(){
  '<div class="cs-edit"><label>Above-fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">A–B only</option></select></label><label>Below-fill range<select id="csBelowScope"><option value="all">Entire recording</option><option value="markers">A–B only</option></select></label></div>',
  '<div class="cs-toolbar"><button type="button" id="csStyleAll">Copy shading to all</button><button type="button" id="csClearStyle">Clear shading</button></div>',
  '</details>',
+ // Always-visible A/B controls are intentionally BELOW, not inside, Shading options.
+ '<div class="cs-markers-below-shading" role="group" aria-label="A and B marker visibility and positions">',
+ '<div class="cs-edit cs-marker-controls"><label><input type="checkbox" id="csShowA" checked> Show A <input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds"> seconds</label><label><input type="checkbox" id="csShowB" checked> Show B <input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds"> seconds</label></div>',
+ '<div class="cs-marker-actions"><button type="button" id="csWindow" title="Restore the automatically detected A/B hold without changing zoom or axes">↺ Reset A/B</button></div>',
+ '</div>',
  '</div>',
  '</aside>',
  '</div></div>',
