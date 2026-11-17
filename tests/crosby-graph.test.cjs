@@ -233,7 +233,7 @@ test('first chart render and Reset / Fit produce identical axes, tick spacing, a
     const first=state();
     assert.deepEqual(first.view,{xmin:0,xmax:item.duration,ymin:0,ymax:4000});
     assert.deepEqual(first.inputBounds,[0,item.duration,0,4000]);
-    assert.equal(first.x.ticks.stepSize,item.duration>120?30:1);
+    assert.equal(first.x.ticks.stepSize,item.duration>120?20:1);
     h.crosbyAction('reset');
     const reset=state();
     assert.deepEqual(reset,first,item.name+' must look identical before and after Reset / Fit');
