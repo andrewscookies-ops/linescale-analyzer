@@ -32,6 +32,9 @@ function load() {
       getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: 400 }; },
       setPointerCapture() {},
       click() { this.emit('click'); },
+      open: false,
+      showModal() { this.open = true; },
+      close() { this.open = false; },
       get innerHTML() { return html; },
       set innerHTML(value) {
         html = value;
@@ -153,10 +156,72 @@ test('explicit views survive graph construction and Focus A–B remains availabl
   assert.deepEqual(markerTimes(t), [10, 12]);
 });
 
-test('Word report content section has its requested heading', () => {
+test('Word Report Content fields live only inside an on-demand modal', () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
-  assert.match(source, /<summary>3 · Word Report Content<\/summary>/);
+  assert.match(source, /<h3 id="csFullReportHeading">Word Report Content<\/h3>/);
   assert.doesNotMatch(source, /Editable Word report content/);
+  assert.equal((source.match(/id="csProjectFields"/g) || []).length, 1);
+  const modal = source.indexOf('<dialog id="csFullReportDialog"');
+  const fields = source.indexOf('<div class="cs-fields" id="csProjectFields">');
+  assert.ok(modal >= 0 && fields > modal, 'Project input boxes belong inside complete-report modal');
+  const h = load();
+  const dialog = h.get('csFullReportDialog');
+  assert.equal(dialog.open, false, 'No report fields visible initially');
+  h.get('csOpenFullReport').click();
+  assert.equal(dialog.open, true, 'Full report button must open variable-input prompt');
+  h.get('csCancelFullReport').click();
+  assert.equal(dialog.open, false);
+});
+
+test('Crosby workflow defaults to graph-only Word and removes PDF and page-count controls', () => {
+  const h = load(), source = fs.readFileSync(sourcePath,'utf8');
+  assert.ok(h.get('csExportGraphs'));
+  assert.ok(h.get('csOpenFullReport'));
+  assert.equal(h.get('csExportGraphs').disabled,true);
+  assert.equal(h.get('csOpenFullReport').disabled,true);
+  for(const removed of ['csPerPage','csExportFormat','csExportContent','csExport','csProjectDetails']) {
+    assert.equal(h.get(removed),null,removed+' should not appear on screen');
+  }
+  assert.doesNotMatch(source,/async function exportPDF|function renderFullPDFIntro|jsPDF|id="csPerPage"|value="pdf"/);
+  assert.match(source,/var per=3;/);
+  assert.match(source,/downloadWord\("graphs","csExportGraphs"\)/);
+  assert.match(source,/downloadWord\("complete","csExportFullReport"\)/);
+  assert.match(source,/<button type="button" class="cs-primary cs-download-main" id="csExportGraphs">Download Graphs \(Word\)<\/button>/);
+  const t=select(h,recording(h));
+  assert.equal(h.get('csExportGraphs').disabled,false);
+  assert.equal(h.get('csOpenFullReport').disabled,false);
+  assert.deepEqual(plain(t.style),plain(recording(h).style));
+});
+
+test('tan A/B band is enabled by default but shading controls stay collapsed', () => {
+  const h=load(),style=plain(h.template()),source=fs.readFileSync(sourcePath,'utf8');
+  assert.equal(style.band,true);
+  assert.equal(style.bandColor,'#D2B48C');
+  assert.equal(style.bandAlpha,.25);
+  assert.equal(style.above,false);
+  assert.equal(style.below,false);
+  assert.match(source,/<details class="cs-advanced"><summary>Shading options<\/summary>/);
+  assert.ok(h.get('csBand'));
+  assert.equal(h.get('csBand').checked,true);
+  assert.equal(h.get('csBandColor').value,'#D2B48C');
+  assert.ok(h.get('csStyleAll'),'Original shading features must remain available');
+  assert.ok(h.get('csClearStyle'),'Clear shading must remain available');
+});
+
+test('main graph toolbar only shows essential controls and zoom adapts time markings', () => {
+  const h=load(),source=fs.readFileSync(sourcePath,'utf8');
+  assert.match(source,/class="cs-toolbar cs-main-tools"/);
+  assert.doesNotMatch(source,/data-cs-view="focus"|data-cs-view="left"|data-cs-view="right"|data-cs-view="up"|data-cs-view="down"/);
+  assert.match(source,/<details class="cs-advanced"><summary>Advanced graph controls<\/summary>/);
+  assert.match(source,/id="csSnapMarkers"/);
+  assert.match(source,/id="csWindow"/);
+  const wide=recording(h,{view:{xmin:0,xmax:120,ymin:0,ymax:4000}});
+  const narrow=recording(h,{view:{xmin:10,xmax:10.8,ymin:0,ymax:4000}});
+  const wideStep=h.graphConfig(wide,720).options.scales.x.ticks.stepSize;
+  const narrowStep=h.graphConfig(narrow,720).options.scales.x.ticks.stepSize;
+  assert.equal(wideStep,10);
+  assert.equal(narrowStep,.05);
+  assert.ok(narrowStep<wideStep);
 });
 
 test('Auto Scale restores 0–4,000 lb while centering time around A/B markers', () => {
