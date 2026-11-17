@@ -2,7 +2,7 @@
 /* TAG Load-cell Analyzer — independent LineScale and Crosby workflow switcher. */
 (function(){
   "use strict";
-  var key="tag-load-cell-workflow-v1";
+  var key="tag-load-cell-workflow-v2"; // New Crosby-first layout starts with Crosby; subsequent selections persist.
   function $(id){return document.getElementById(id);}
   function activate(mode,save){
     mode=mode==="crosby"?"crosby":"linescale";
@@ -29,11 +29,11 @@
     nav.innerHTML=[
       '<p class="tag-switch-label">TAG Load-cell Analyzer · choose a workflow</p>',
       '<div class="tag-switch-options">',
-        '<button type="button" class="tag-switch-option" id="tagWorkflowLineScale" aria-pressed="false">',
-          '<span><strong>LineScale</strong><small>Dynamic & static recordings</small></span><span class="tag-switch-status">Open</span>',
-        '</button>',
         '<button type="button" class="tag-switch-option" id="tagWorkflowCrosby" aria-pressed="false">',
           '<span><strong>Crosby</strong><small>Anchor tests & report builder</small></span><span class="tag-switch-status">Open</span>',
+        '</button>',
+        '<button type="button" class="tag-switch-option" id="tagWorkflowLineScale" aria-pressed="false">',
+          '<span><strong>LineScale</strong><small>Dynamic & static recordings</small></span><span class="tag-switch-status">Open</span>',
         '</button>',
       '</div>',
       '<p class="tag-switch-caption" id="tagWorkflowHint" role="status"></p>'
@@ -41,7 +41,7 @@
     header.insertAdjacentElement("afterend",nav);
     function showStatus(){
       var active=document.body.dataset.tagMode;
-      [["tagWorkflowLineScale","linescale"],["tagWorkflowCrosby","crosby"]].forEach(function(x){
+      [["tagWorkflowCrosby","crosby"],["tagWorkflowLineScale","linescale"]].forEach(function(x){
         var btn=$(x[0]);if(!btn)return;
         var status=btn.querySelector(".tag-switch-status");
         if(status)status.textContent=active===x[1]?"Active":"Open";
@@ -49,7 +49,7 @@
     }
     $("tagWorkflowLineScale").addEventListener("click",function(){activate("linescale",true);showStatus();});
     $("tagWorkflowCrosby").addEventListener("click",function(){activate("crosby",true);showStatus();});
-    var saved="linescale";try{saved=localStorage.getItem(key)||saved;}catch(e){}
+    var saved="crosby";try{saved=localStorage.getItem(key)||saved;}catch(e){}
     if(window.location.hash==="#setup")saved="linescale";
     activate(saved,false);showStatus();
   }
