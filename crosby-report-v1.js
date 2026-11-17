@@ -928,7 +928,8 @@ function example(){
   var force=i<10?30+18*Math.sin(i*1.1):
    i<20?40+(i-10)*310:
    i<34?3060+45*Math.sin((i-20)/3):
-   Math.max(0,3100-(i-34)*310);
+   // Begin unloading from the final held value, with no artificial spike at 34 s.
+   Math.max(0,3060+45*Math.sin(13/3)-(i-33)*310);
   lines.push("40554,12-November-2026,08:00:"+String(i).padStart(2,"0")+":00,"+Math.round(force)+",lb,No,No");
  }
  var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
