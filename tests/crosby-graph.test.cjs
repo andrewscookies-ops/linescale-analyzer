@@ -150,6 +150,23 @@ test('initial imported view is identical to Reset / Fit with marker positions un
   assert.deepEqual(plain(t.style),markerBefore,'Reset / Fit must not touch A/B');
 });
 
+test('Graph View stays collapsed inside Advanced Controls beside Shading Options', () => {
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const options=source.indexOf('<div class="cs-inspector-options">');
+  const advanced=source.indexOf('<details class="cs-advanced"><summary>Advanced controls</summary>',options);
+  const panel=source.indexOf('<section class="cs-axis-controller"',advanced);
+  const bounds=source.indexOf('id="csXStart"',panel);
+  const yBounds=source.indexOf('id="csYMax"',panel);
+  const advancedEnd=source.indexOf(" '</details>',",advanced);
+  const shading=source.indexOf('<details class="cs-advanced"><summary>Shading options</summary>',advancedEnd);
+  assert.ok(options>=0&&advanced>options&&panel>advanced&&bounds>panel&&yBounds>bounds&&advancedEnd>yBounds,
+    'Graph View and editable X/Y controls must be inside Advanced Controls');
+  assert.ok(shading>advancedEnd,
+    'Shading Options must remain a separate sibling dropdown at the same level');
+  assert.doesNotMatch(source,/<details class="cs-advanced" open><summary>Advanced controls/,
+    'Advanced Controls must be collapsed by default');
+});
+
 test('compact axis pad and editable X/Y limits stay synchronized with chart', () => {
   const h=load(),t=select(h,recording(h));
   const source=fs.readFileSync(sourcePath,'utf8');
