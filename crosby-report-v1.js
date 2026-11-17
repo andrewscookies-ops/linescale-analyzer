@@ -327,23 +327,32 @@ function validateCrosbyAxisRange(start,end){
  return {xmin:lo,xmax:hi};
 }
 function syncCrosbyAxisInputs(t){
- var start=$("csXStart"),end=$("csXEnd");if(!start||!end)return;
- if(!t){start.value="";end.value="";return;}
- var v=crosbyView(t);
- start.value=String(Number(v.xmin.toFixed(3)));
- end.value=String(Number(v.xmax.toFixed(3)));
+ var fields=[["csXStart","xmin"],["csXEnd","xmax"],["csYMin","ymin"],["csYMax","ymax"]];
+ var v=t?crosbyView(t):null;
+ fields.forEach(function(item){
+  var el=$(item[0]);if(!el)return;
+  el.value=v?String(Number(v[item[1]].toFixed(6))):"";
+ });
 }
 function applyCrosbyAxisInputs(){
  var t=selected();if(!t)return;
- var range=validateCrosbyAxisRange($("csXStart").value,$("csXEnd").value);
- if(!range){status("Enter valid X-axis start and end times; end must be greater than start.",true);return;}
- setCrosbyView(Object.assign(crosbyView(t),range));
+ var x=validateCrosbyAxisRange($("csXStart").value,$("csXEnd").value);
+ var y=validateCrosbyAxisRange($("csYMin").value,$("csYMax").value);
+ if(!x||!y){
+  status("Enter valid X and Y limits. Each maximum must be greater than its minimum.",true);
+  return;
+ }
+ setCrosbyView({xmin:x.xmin,xmax:x.xmax,ymin:y.xmin,ymax:y.xmax});
 }
 
 function crosbyTickStep(viewSpan,chartWidth){
- var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
- var steps=[.005,.01,.02,.05,.1,.2,.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
- for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-7)return steps[i];
+ // Crosby's usual 1 Hz readings should have 1-second tick granularity.
+ // When zoomed in below one second, show fractional ticks. Longer windows
+ // can use coarser steps; Chart.js hides overlapping labels automatically.
+ if(viewSpan>=1&&viewSpan<=120)return 1;
+ var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/52));
+ var steps=[.001,.002,.005,.01,.02,.05,.1,.2,.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
+ for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-9)return steps[i];
  return Math.ceil(desired/1200)*1200;
 }
 function crosbySampleSeconds(t){
@@ -376,6 +385,7 @@ function graphConfig(t,widthHint){
    onResize:function(chart,size){
     var x=chart.scales?.x;if(!x)return;
     chart.options.scales.x.ticks.stepSize=crosbyTickStep(x.max-x.min,size.width);
+    chart.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor(size.width/52));
    },
    parsing:false,normalized:true,
    plugins:{legend:{display:false},tooltip:{enabled:true,callbacks:{
@@ -384,7 +394,7 @@ function graphConfig(t,widthHint){
    }}},
    scales:{
     x:{type:"linear",min:v.xmin,max:v.xmax,title:{display:true,text:"Elapsed time (seconds)",color:"#526479"},
-      ticks:{color:"#526479",stepSize:step,autoSkip:false,maxRotation:0,
+      ticks:{color:"#526479",stepSize:step,autoSkip:true,maxTicksLimit:Math.max(6,Math.floor(width/52)),maxRotation:0,
        callback:function(value){return Number(value).toLocaleString(undefined,{maximumFractionDigits:2});}},
       grid:{color:"#e4e8ec"}},
     y:{type:"linear",min:v.ymin,max:v.ymax,title:{display:true,text:"Force (lb)",color:"#526479"},ticks:{color:"#526479",callback:function(v){return Number(v).toLocaleString();}},grid:{color:"#dfe5e9"}}
@@ -463,8 +473,9 @@ async function importFiles(files){
 function setWindow(){
  var t=selected();if(!t)return;
  var found=placeAutomaticMarkers(t,true);
- t.view=null;loadStyle();draw();
- status(found?"A/B reset to first qualifying "+project.hold+" s hold.":"No continuous "+project.hold+" s hold above "+project.minimum+" lb. Markers hidden for review.",!found);
+ // Marker reset is distinct from Reset / Fit: preserve the current view.
+ loadStyle();draw();
+ status(found?"A/B restored to the first qualifying "+project.hold+" s hold.":"No continuous "+project.hold+" s hold above "+project.minimum+" lb. Markers hidden for review.",!found);
 }
 // Gentle magnetic snapping only on drag release. This deliberately leaves
 // typed values and non-nearby fractional marker positions unchanged.
@@ -537,6 +548,7 @@ function setCrosbyView(v){
  t.view=v;
  ch.options.scales.x.min=v.xmin;ch.options.scales.x.max=v.xmax;
  ch.options.scales.x.ticks.stepSize=crosbyTickStep(v.xmax-v.xmin,ch.chartArea?.width||720);
+ ch.options.scales.x.ticks.maxTicksLimit=Math.max(6,Math.floor((ch.chartArea?.width||720)/52));
  ch.options.scales.y.min=v.ymin;ch.options.scales.y.max=v.ymax;ch.update("none");
  syncCrosbyAxisInputs(t);
 }
@@ -552,6 +564,18 @@ function crosbyAction(action){
  var v=crosbyView(t);
  if(action==="in"||action==="out"){setCrosbyView(crosbyZoom(v,action==="in"?.8:1.25,.5,.5));return;}
  setCrosbyView(crosbyPan(v,action==="left"?.15:action==="right"?-.15:0,action==="up"?.15:action==="down"?-.15:0));
+}
+function panCrosbyPad(direction){
+ var t=selected();if(!t||!S.chart)return;
+ var v=crosbyView(t),next=Object.assign({},v);
+ var dx=(v.xmax-v.xmin)*.1,dy=(v.ymax-v.ymin)*.1;
+ if(direction==="left"){next.xmin-=dx;next.xmax-=dx;}
+ else if(direction==="right"){next.xmin+=dx;next.xmax+=dx;}
+ else if(direction==="up"){next.ymin+=dy;next.ymax+=dy;}
+ else if(direction==="down"){next.ymin-=dy;next.ymax-=dy;}
+ else return;
+ // Keep pan arrows independent of the wheel/pinch axis preference.
+ setCrosbyView(next);
 }
 function dragBind(){
  var c=$("csCanvas");
@@ -944,7 +968,14 @@ function bind(){
  $("csWindow").addEventListener("click",setWindow);
  $("csStyleAll").addEventListener("click",copyStyle);
  $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
- ["csXStart","csXEnd"].forEach(function(id){$(id).addEventListener("change",applyCrosbyAxisInputs);});
+ ["csXStart","csXEnd","csYMin","csYMax"].forEach(function(id){
+  var el=$(id);
+  el.addEventListener("change",applyCrosbyAxisInputs);
+  el.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();el.blur();}});
+ });
+ document.querySelectorAll("#csWorkflow [data-cs-pan]").forEach(function(btn){
+  btn.addEventListener("click",function(){panCrosbyPad(btn.dataset.csPan);});
+ });
  document.querySelectorAll("#csWorkflow [data-cs-view]").forEach(function(btn){
   btn.addEventListener("click",function(){crosbyAction(btn.dataset.csView);});
  });
