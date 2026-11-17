@@ -79,7 +79,7 @@ function load() {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const expose = `globalThis.__crosby = {
     S, project, template, install, parseCrosby, crosbyView, graphConfig,
-    refreshCrosbyStats, crosbyAction, refresh, importFiles, reportData,
+    refreshCrosbyStats, crosbyAction, refresh, importFiles, reportData, preview,
     snapCrosbyMarkers: typeof snapCrosbyMarkers === 'function' ? snapCrosbyMarkers : undefined,
     appliedLoadLabel, wordAnchorRows,
     fitCrosbyView, panCrosbyPad, applyCrosbyAxisInputs
@@ -132,6 +132,63 @@ test('new recordings open across their full duration without changing markers', 
   assert.deepEqual([config.options.scales.x.min, config.options.scales.x.max], [0, 120]);
   assert.deepEqual(plain(t.style), before);
   assert.equal(t.view, null);
+});
+
+test('Step 1 View does not redraw or alter the currently selected graph', () => {
+  const h=load(),t=select(h,recording(h,{
+    view:{xmin:11.123,xmax:32.987,ymin:200,ymax:3600},
+    comments:'Manual graph notes'
+  }));
+  t.style.a=17.12345;t.style.b=27.98765;t.style.bandColor='#aabbcc';
+  t.markerManual=true;
+  h.refresh();
+  const before=plain(h.reportData()),originalChart=h.S.chart;
+  const xStart=h.get('csXStart').value,yMax=h.get('csYMax').value;
+  // Exercise the actual delegated click path from the View button in Step 1.
+  h.get('csRows').emit('click',{target:{
+    closest(selector){
+      assert.equal(selector,'[data-open]');
+      return {dataset:{open:'0'}};
+    }
+  }});
+  assert.equal(h.S.chart,originalChart,'Same-row View should not reconstruct the chart');
+  assert.deepEqual(plain(h.reportData()),before,'View must not reset any graph annotations or view limits');
+  assert.equal(h.get('csXStart').value,xStart);
+  assert.equal(h.get('csYMax').value,yMax);
+});
+
+test('switching Step 1 View recordings restores each graph exactly as edited', () => {
+  const h=load();
+  const first=recording(h,{
+    name:'first.csv',id:'1',anchor:1,
+    view:{xmin:5.321,xmax:28.45,ymin:180,ymax:3795},
+    comments:'First recording'
+  });
+  const second=recording(h,{
+    name:'second.csv',id:'2',anchor:2,
+    view:{xmin:1.25,xmax:9.5,ymin:50,ymax:5400},
+    comments:'Second recording'
+  });
+  Object.assign(first.style,{a:6.123456,b:13.98765,band:true,bandColor:'#abbea1',bandAlpha:.4});
+  first.markerManual=true;
+  Object.assign(second.style,{a:2.75,b:7.125,band:false,above:true});
+  second.markerManual=true;
+  h.S.tests=[first,second];h.refresh();
+  const beforeFirst=plain(first),beforeSecond=plain(second);
+  const firstChart=h.S.chart;
+  h.get('csRows').emit('click',{target:{closest:()=>({dataset:{open:'1'}})}});
+  assert.notEqual(h.S.chart,firstChart,'Viewing another recording must display its own graph');
+  assert.equal(h.S.chart.$crosby,second);
+  assert.deepEqual([Number(h.get('csXStart').value),Number(h.get('csYMax').value)],[1.25,5400]);
+  h.get('csRows').emit('click',{target:{closest:()=>({dataset:{open:'0'}})}});
+  assert.equal(h.S.chart.$crosby,first);
+  assert.deepEqual([Number(h.get('csXStart').value),Number(h.get('csYMax').value)],[5.321,3795]);
+  assert.deepEqual(plain(first),beforeFirst,'First graph settings must survive View navigation');
+  assert.deepEqual(plain(second),beforeSecond,'Second graph settings must survive View navigation');
+  // Explicit programmatic refreshes (e.g. after loading a preset) must still redraw.
+  const active=h.S.chart;
+  h.refresh();
+  assert.notEqual(h.S.chart,active,'Refresh must remain able to redraw modified data');
 });
 
 test('initial imported view is identical to Reset / Fit with marker positions untouched', () => {
