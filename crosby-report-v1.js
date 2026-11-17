@@ -3,7 +3,7 @@
    Distinct from LineScale processing. Local CSV import; no uploads. */
 (function(){
 "use strict";
-var S={tests:[],current:0,chart:null,drag:null,planImage:null,axis:'both',gesture:null,pointers:new Map()};
+var S={tests:[],current:0,chart:null,drag:null,planImage:null,gesture:null,pointers:new Map()};
 var $=function(id){return document.getElementById(id);};
 var template=function(){return {a:0,b:10,showA:true,showB:true,band:true,bandColor:"#D2B48C",bandAlpha:.25,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
 var project={
@@ -157,7 +157,7 @@ function install(){
  '<div class="cs-inspector-options">',
  '<details class="cs-advanced"><summary>Advanced controls</summary>',
  '<section class="cs-axis-controller" aria-labelledby="csAxisHeading">',
- '<div class="cs-axis-title"><strong id="csAxisHeading">Graph view</strong><span>Tap arrows or edit bounds</span></div>',
+ '<div class="cs-axis-title"><strong id="csAxisHeading">Graph view</strong></div>',
  '<div class="cs-axis-row">',
  '<div class="cs-dpad" role="group" aria-label="Move graph view">',
  '<span class="cs-pad-blank" aria-hidden="true"></span><button type="button" data-cs-pan="up" aria-label="Move graph view up" title="Pan upward">↑</button><span class="cs-pad-blank" aria-hidden="true"></span>',
@@ -174,10 +174,7 @@ function install(){
  '<button type="button" data-cs-view="out" aria-label="Zoom out" title="Zoom out to see more of the graph"><span aria-hidden="true">−</span> Out</button>',
  '<button type="button" data-cs-view="in" aria-label="Zoom in" title="Zoom in to inspect graph details"><span aria-hidden="true">＋</span> In</button>',
  '</div></div>',
- '<p class="cs-mini cs-pad-help">Arrows move the view by 10%. Zoom changes the visible range; X-axis marks start at 1 second and adjust automatically.</p>',
  '</section>',
- '<div class="cs-toolbar"><label>Wheel/pinch axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label></div>',
- '<p class="cs-muted">Auto Scale shows 10 seconds around A/B at 0–4,000 lb. Reset / Fit shows the full recording; neither moves the markers.</p>',
  '<div class="cs-toolbar"><button type="button" id="csPng">Save graph as PNG</button></div>',
  '<label>Anchor comments<textarea id="csComments" rows="2" placeholder="Identification, creep observations, notes"></textarea></label>',
  '</details>',
@@ -568,14 +565,14 @@ function csInside(p,a){return p.x>=a.left&&p.x<=a.right&&p.y>=a.top&&p.y<=a.bott
 function crosbyZoom(v,f,x,y){
  f=Math.max(.08,Math.min(12,f));x=Math.min(1,Math.max(0,x));y=Math.min(1,Math.max(0,y));
  var n=Object.assign({},v);
- if(S.axis!=="force"){var w=Math.max(.001,(v.xmax-v.xmin)*f),cx=v.xmin+(v.xmax-v.xmin)*x;n.xmin=cx-w*x;n.xmax=n.xmin+w;}
- if(S.axis!=="time"){var h=Math.max(.01,(v.ymax-v.ymin)*f),cy=v.ymin+(v.ymax-v.ymin)*y;n.ymin=cy-h*y;n.ymax=n.ymin+h;}
+ var w=Math.max(.001,(v.xmax-v.xmin)*f),cx=v.xmin+(v.xmax-v.xmin)*x;n.xmin=cx-w*x;n.xmax=n.xmin+w;
+ var h=Math.max(.01,(v.ymax-v.ymin)*f),cy=v.ymin+(v.ymax-v.ymin)*y;n.ymin=cy-h*y;n.ymax=n.ymin+h;
  return n;
 }
 function crosbyPan(v,dx,dy){
  var n=Object.assign({},v);
- if(S.axis!=="force"){var w=v.xmax-v.xmin;n.xmin-=dx*w;n.xmax-=dx*w;}
- if(S.axis!=="time"){var h=v.ymax-v.ymin;n.ymin+=dy*h;n.ymax+=dy*h;}
+ var w=v.xmax-v.xmin;n.xmin-=dx*w;n.xmax-=dx*w;
+ var h=v.ymax-v.ymin;n.ymin+=dy*h;n.ymax+=dy*h;
  return n;
 }
 function setCrosbyView(v){
@@ -609,7 +606,6 @@ function panCrosbyPad(direction){
  else if(direction==="up"){next.ymin+=dy;next.ymax+=dy;}
  else if(direction==="down"){next.ymin-=dy;next.ymax-=dy;}
  else return;
- // Keep pan arrows independent of the wheel/pinch axis preference.
  setCrosbyView(next);
 }
 function dragBind(){
@@ -1020,7 +1016,6 @@ function bind(){
  $("csNext").addEventListener("click",function(){preview((S.current+1)%S.tests.length);});
  $("csWindow").addEventListener("click",setWindow);
  $("csStyleAll").addEventListener("click",copyStyle);
- $("csViewAxis").addEventListener("change",function(){S.axis=this.value;});
  ["csXStart","csXEnd","csYMin","csYMax"].forEach(function(id){
   var el=$(id);
   el.addEventListener("change",applyCrosbyAxisInputs);
