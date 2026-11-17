@@ -350,7 +350,7 @@ function crosbyTickStep(viewSpan,chartWidth){
  // When zoomed in below one second, show fractional ticks. Longer windows
  // can use coarser steps; Chart.js hides overlapping labels automatically.
  if(viewSpan>=1&&viewSpan<=120)return 1;
- var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/52));
+ var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
  var steps=[.001,.002,.005,.01,.02,.05,.1,.2,.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
  for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-9)return steps[i];
  return Math.ceil(desired/1200)*1200;
