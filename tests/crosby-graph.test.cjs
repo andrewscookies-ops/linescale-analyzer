@@ -789,6 +789,58 @@ test('default Crosby graph shows integer-second and integer-pound labels, withou
     'Fractions remain visible under a 1-second zoom');
 });
 
+test('Auto Scale adds one-second gridlines while labeling every two seconds only', () => {
+  const h=load(),t=select(h,recording(h,{
+    view:{xmin:0,xmax:120,ymin:0,ymax:4000}
+  }));
+  Object.assign(t.style,{a:25,b:35,showA:true,showB:true});
+  const ordinary=h.S.chart.options.scales.x.ticks;
+  assert.equal(ordinary.stepSize,1);
+  assert.equal(ordinary.autoSkip,true,'Normal graph retains normal label and grid density');
+  assert.equal(ordinary.callback.call({min:0,max:120},17),'17',
+    'Normal graph must still be capable of labeling odd seconds');
+
+  h.crosbyAction('autoscale');
+  assert.deepEqual(plain(t.view),{xmin:15,xmax:45,ymin:0,ymax:4000});
+  assert.equal(t.autoScaleTicks,true);
+  const ticks=h.S.chart.options.scales.x.ticks;
+  assert.equal(ticks.stepSize,1,'Gridline interval remains exactly one second');
+  assert.equal(ticks.autoSkip,false,'Auto Scale must not skip every other gridline');
+  assert.ok(ticks.maxTicksLimit>=32,'Chart tick generator must keep every second');
+  const tickLabels=Array.from({length:31},(_,i)=>{
+    const v=i+15;
+    return {second:v,label:ticks.callback.call({min:15,max:45},v)};
+  });
+  assert.deepEqual(
+    tickLabels.filter(x=>x.label!=='').map(x=>x.second),
+    [16,18,20,22,24,26,28,30,32,34,36,38,40,42,44],
+    'Auto Scale labels only even seconds, with blank labels for odd gridlines');
+  assert.equal(ticks.callback.call({min:15,max:45},20),'20');
+  assert.equal(ticks.callback.call({min:15,max:45},21),'');
+
+  const cfg=h.graphConfig(t,720);
+  assert.equal(cfg.options.scales.x.ticks.autoSkip,false,'Exported graph uses Auto Scale grid');
+  const resized={scales:{x:{min:15,max:45}},options:cfg.options};
+  cfg.options.onResize(resized,{width:350});
+  assert.equal(resized.options.scales.x.ticks.autoSkip,false,'Resize must keep one-second grid');
+  assert.equal(resized.options.scales.x.ticks.stepSize,1);
+  assert.ok(resized.options.scales.x.ticks.maxTicksLimit>=32);
+
+  h.refresh();
+  assert.equal(h.S.chart.options.scales.x.ticks.autoSkip,false,
+    'Reopening the same graph must preserve selected Auto Scale grid');
+  h.crosbyAction('reset');
+  const restored=h.S.chart.options.scales.x.ticks;
+  assert.equal(t.autoScaleTicks,false);
+  assert.equal(restored.autoSkip,true,'Reset / Fit restores original normal ticks');
+  assert.equal(restored.callback.call({min:0,max:120},17),'17');
+
+  h.crosbyAction('autoscale');
+  h.crosbyAction('in');
+  assert.equal(t.autoScaleTicks,false,'Manual zoom exits Auto Scale tick styling');
+  assert.equal(h.S.chart.options.scales.x.ticks.autoSkip,true);
+});
+
 test('adaptive tick spacing and sample dots still respond to zoom and width', () => {
   const h = load(), t = recording(h, { view: { xmin: 0, xmax: 16, ymin: 0, ymax: 4000 } });
   const config = h.graphConfig(t, 720), radius = config.data.datasets[0].pointRadius;
