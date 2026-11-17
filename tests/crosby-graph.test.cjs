@@ -446,8 +446,13 @@ test('sample recording provides ten measured 10–50 lb seconds before the pull'
     'All pre-pull tension samples must be within 10–50 lb');
   assert.ok(t.points.slice(11,20).some(p=>p.y>=500),
     'The pull should begin after the initial low-tension period');
-  assert.ok(t.points[34].y<t.points[33].y,
-    'Releasing the load at 34 seconds must not create an upward spike');
+  const y33=t.points[33].y,y34=t.points[34].y,y35=t.points[35].y;
+  assert.ok(y33>y34&&y34>y35,
+    'Example must begin a continuous decline through 33, 34 and 35 seconds');
+  assert.ok(y33-y34>0&&y33-y34<100,
+    'The first second of unloading must have a gentle shoulder, not a sharp drop');
+  assert.ok(y34-y35>y33-y34&&y34-y35<200,
+    'Unloading should accelerate smoothly through 35 seconds');
   assert.ok(t.points.slice(34).every((point,i,arr)=>i===0||point.y<=arr[i-1].y),
     'The example must unload monotonically after the hold');
   assert.equal(t.style.showA,true,'Qualifying hold must be found in the demo');
