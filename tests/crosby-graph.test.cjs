@@ -498,6 +498,32 @@ test('example starts with 11 low-tension readings, eases to 3100 lb, holds 13 s 
   assert.ok(initial.xmax>t.view.xmax-t.view.xmin,'Auto Scale must narrow the example graph');
 });
 
+test('Previous, Next, Auto Scale, and Reset / Fit scroll with the sticky graph', () => {
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const css=fs.readFileSync(__dirname+'/../crosby-report-v1.css','utf8');
+  const workspace=source.indexOf('<div class="cs-graph-workspace">');
+  const plot=source.indexOf('<div class="cs-plot-column">',workspace);
+  const toolbar=source.indexOf('class="cs-toolbar cs-main-tools"',plot);
+  const graph=source.indexOf('class="cs-chart"',toolbar);
+  const inspector=source.indexOf('<aside class="cs-graph-inspector"',graph);
+  assert.ok(workspace>=0&&plot>workspace&&toolbar>plot&&graph>toolbar&&inspector>graph,
+    'The entire navigation toolbar must precede the graph INSIDE its sticky plot column');
+  const controls=source.slice(toolbar,graph);
+  for(const button of ['id="csPrevious"','id="csNext"','data-cs-view="autoscale"','data-cs-view="reset"'])
+    assert.ok(controls.includes(button),button+' must stay with the graph');
+  assert.equal((source.match(/class="cs-toolbar cs-main-tools"/g)||[]).length,1);
+  assert.match(css,/\.cs-plot-column\{min-width:0;position:sticky;top:12px\}/,
+    'Plot column must stick to the viewport while the inspector is scrolled');
+  const h=load();
+  const first=recording(h,{id:'1',name:'first.csv',anchor:1});
+  const second=recording(h,{id:'2',name:'second.csv',anchor:2});
+  h.S.tests=[first,second];h.refresh();
+  h.get('csNext').click();
+  assert.equal(h.S.current,1,'Next must remain operational in the sticky toolbar');
+  h.get('csPrevious').click();
+  assert.equal(h.S.current,0,'Previous must remain operational in the sticky toolbar');
+});
+
 test('main graph toolbar only shows essential controls and zoom adapts time markings', () => {
   const h=load(),source=fs.readFileSync(sourcePath,'utf8');
   assert.match(source,/class="cs-toolbar cs-main-tools"/);
