@@ -5,7 +5,7 @@
 "use strict";
 var S={tests:[],current:0,chart:null,drag:null,planImage:null,axis:'both',gesture:null,pointers:new Map()};
 var $=function(id){return document.getElementById(id);};
-var template=function(){return {a:0,b:10,showA:true,showB:true,band:false,bandColor:"#f59e0b",bandAlpha:.18,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
+var template=function(){return {a:0,b:10,showA:true,showB:true,band:true,bandColor:"#D2B48C",bandAlpha:.24,above:false,aboveColor:"#22c55e",aboveAlpha:.18,aboveScope:"all",below:false,belowColor:"#3b82f6",belowAlpha:.18,belowScope:"all"};};
 var project={
  date:"November 12, 2026",client:"Camp Seneca Lake",location:"",manager:"Rich Petteruti",tester:"Benjamin Browand",
  course:"The new Camp Seneca Lake challenge course is installed on 50-foot utility poles and supported by ground anchors. New course anchors were installed by The Adventure Guild. Existing anchors for the Giant Swing and Zip Line were also tested.",
@@ -16,7 +16,7 @@ var project={
  fail:"The anchor did not meet the stated test criteria and must not be used.",
  ni:"The anchor was not tested; its use is subject to TAG policy.",
  model:"Crosby Straightpoint Tensionmeter BLD6T5",serial:"40554",
- minimum:3000,hold:10,graphsPerPage:3,exportFormat:"word",exportContent:"complete"
+ minimum:3000,hold:10
 };
 var fieldMap=[
  ["date","Testing date"],["client","Client"],["location","Location"],["manager","Project manager"],
@@ -135,40 +135,42 @@ function install(){
  if(!hero)return;
  var box=document.createElement("section");box.id="csWorkflow";box.className="card";
  box.innerHTML=[
- '<div class="cs-inline" style="justify-content:space-between"><div><p class="eyebrow">Crosby Straightpoint · distinct workflow</p><h2>Anchor load testing & report builder</h2></div><span class="cs-flag">Crosby CSV</span></div>',
- '<p class="cs-intro">Import the original Crosby reports, review the test-to-anchor mapping, annotate force-time graphs, and export a fully editable Word report or graph-only PDF pages for an existing report. All processing stays in this browser.</p>',
+ '<div class="cs-inline" style="justify-content:space-between"><div><p class="eyebrow">Crosby Straightpoint · distinct workflow</p><h2>Anchor load testing &amp; report builder</h2></div><span class="cs-flag">Crosby CSV</span></div>',
+ '<p class="cs-intro">Import Crosby CSV recordings, review anchor assignments and adjust the graphs, then download an editable Word document with three graphs per page. All processing stays in your browser.</p>',
  '<div class="cs-toolbar"><button type="button" class="cs-primary" id="csImport">＋ Import up to 50 Crosby CSVs</button><input id="csFiles" type="file" accept=".csv,text/csv" multiple hidden><span class="cs-muted" id="csCount">0 / 50 loaded</span><button type="button" id="csDemo">Load a small example</button><button type="button" id="csReset">Clear imports</button></div>',
  '<div class="cs-status" id="csStatus" role="status" aria-live="polite"></div>',
- '<div class="cs-panel" style="max-width:660px;margin:10px 0 14px"><div class="cs-report-controls"><label>Minimum test load (lb)<input id="csTarget" type="number" min="0" step="10" value="3000"></label><label>Hold duration (seconds)<input id="csHold" type="number" min="0" step="1" value="10"></label></div></div>',
- '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">The instrument labels (such as 2.2 or 14 L) are not the final anchor mapping. Confirm each assignment and select which recordings to include. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
+ '<div class="cs-panel cs-test-criteria"><div class="cs-report-controls"><label>Minimum test load (lb)<input id="csTarget" type="number" min="0" step="10" value="3000"></label><label>Hold duration (seconds)<input id="csHold" type="number" min="0" step="1" value="10"></label></div></div>',
+ '<details open><summary>1 · Review recordings and anchor assignments</summary><p class="cs-muted">Confirm each anchor assignment and select which tests to include. Imported files are never modified.</p><div class="cs-scroll"><table><thead><tr><th>Graph</th><th>Crosby log ID / filename</th><th>Anchor #</th><th>Anchor description</th><th>Peak (lb)</th><th>Max observed hold</th><th>Include</th></tr></thead><tbody id="csRows"></tbody></table></div></details>',
  '<div class="cs-panel" id="csGraphPanel"><h3 id="csGraphHeading">2 · Graph editor — import data to begin</h3>',
- '<div class="cs-toolbar"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" id="csWindow">Reset A/B to qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to seconds</button><button type="button" id="csStyleAll">Copy this graph style to all</button></div>',
- '<div class="cs-toolbar cs-view-tools" aria-label="Adjust Crosby graph"><button type="button" data-cs-view="autoscale" title="10 seconds before A, 10 seconds after B">Auto Scale</button><button type="button" data-cs-view="focus">Focus A–B</button><button type="button" data-cs-view="in">＋ Zoom</button><button type="button" data-cs-view="out">− Zoom</button><label>Axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label><button type="button" data-cs-view="left" aria-label="Pan left">←</button><button type="button" data-cs-view="right" aria-label="Pan right">→</button><button type="button" data-cs-view="up" aria-label="Pan up">↑</button><button type="button" data-cs-view="down" aria-label="Pan down">↓</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
+ '<div class="cs-toolbar cs-main-tools"><button type="button" id="csPrevious">← Previous</button><button type="button" id="csNext">Next →</button><button type="button" data-cs-view="autoscale" title="Show 10 seconds before marker A and after marker B with 0–4,000 lb force scale">Auto Scale</button><button type="button" data-cs-view="in" aria-label="Zoom in">＋ Zoom</button><button type="button" data-cs-view="out" aria-label="Zoom out">− Zoom</button><button type="button" data-cs-view="reset">Reset / Fit</button></div>',
  '<div class="cs-chart"><canvas id="csCanvas" aria-label="Crosby load over time"></canvas></div><div class="cs-graph-stats" id="csStats"></div>',
- '<h4 style="margin:12px 0 5px;font-size:13px">X-axis range</h4>',
+ '<p class="cs-muted cs-gesture-help">Drag A/B markers to adjust the shaded hold window. Scroll or pinch to zoom, and drag the graph to pan. Time markings automatically adjust with zoom.</p>',
+ '<div class="cs-edit cs-marker-controls"><label><input type="checkbox" id="csShowA" checked> Show A <input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds"> seconds</label><label><input type="checkbox" id="csShowB" checked> Show B <input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds"> seconds</label></div>',
+ '<details class="cs-advanced"><summary>Advanced graph controls</summary>',
+ '<div class="cs-toolbar"><button type="button" id="csWindow">Auto-place A/B on qualifying hold</button><button type="button" id="csSnapMarkers">Snap A/B to measured times</button><label>Zoom and pan axes<select id="csViewAxis"><option value="both">Both</option><option value="time">Time</option><option value="force">Force</option></select></label></div>',
  '<div class="cs-edit" role="group" aria-label="Crosby X-axis range"><label>X-axis start (seconds)<input id="csXStart" type="number" step="any" placeholder="Start"></label><label>X-axis end (seconds)<input id="csXEnd" type="number" step="any" placeholder="End"></label></div>',
- '<p class="cs-muted">Auto Scale shows 10 seconds before A and 10 seconds after B (30 seconds if A–B is 10 seconds). Enter exact X-axis start/end times to override the view. Focus A–B, zoom, pan and Reset / Fit remain available. A/B marker positions never change when scaling.</p>',
- '<div class="cs-edit"><label><input type="checkbox" id="csShowA" checked> Show marker A<input type="number" min="0" step="any" id="csMarkerA" value="0" aria-label="Marker A time seconds">Seconds</label>',
- '<label><input type="checkbox" id="csShowB" checked> Show marker B<input type="number" min="0" step="any" id="csMarkerB" value="10" aria-label="Marker B time seconds">Seconds</label>',
- '<label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
- '<label>Below-line fill range<select id="csBelowScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label>',
- '</div>',
- '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csBand"> Fill between markers</label><label>Color<input type="color" id="csBandColor" value="#f59e0b"></label><label>Opacity<input type="range" id="csBandAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
+ '<p class="cs-muted">Auto Scale adds up to 10 seconds before A and after B; Reset / Fit shows the complete recording. A/B positions do not move when scaling.</p>',
+ '<div class="cs-toolbar"><button type="button" id="csPng">Save current graph as PNG</button></div>',
+ '<label>Graph / anchor comments (editable)<textarea id="csComments" rows="2" placeholder="Anchor identification, creep observations, notes"></textarea></label>',
+ '</details>',
+ '<details class="cs-advanced"><summary>Shading options</summary>',
+ '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csBand" checked> Shade between A and B</label><label>Color<input type="color" id="csBandColor" value="#D2B48C"></label><label>Opacity<input type="range" id="csBandAlpha" min="0" max=".75" step=".05" value=".25"></label></div>',
  '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csAbove"> Fill above graph line</label><label>Color<input type="color" id="csAboveColor" value="#22c55e"></label><label>Opacity<input type="range" id="csAboveAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
  '<div class="cs-fill-row"><label class="cs-check"><input type="checkbox" id="csBelow"> Fill below graph line</label><label>Color<input type="color" id="csBelowColor" value="#3b82f6"></label><label>Opacity<input type="range" id="csBelowAlpha" min="0" max=".75" step=".05" value=".2"></label></div>',
- '<div class="cs-toolbar"><button type="button" id="csPng">Download this graph (PNG)</button><button type="button" id="csClearStyle">Clear graph shading</button></div>',
- '<label>Graph / anchor comments (editable)<textarea id="csComments" rows="2" placeholder="Anchor identification, creep observations, notes"></textarea></label></div>',
- '<details id="csProjectDetails"><summary>3 · Word Report Content</summary>',
+ '<div class="cs-edit"><label>Above-line fill range<select id="csAboveScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label><label>Below-line fill range<select id="csBelowScope"><option value="all">Entire recording</option><option value="markers">Between A and B only</option></select></label></div>',
+ '<div class="cs-toolbar"><button type="button" id="csStyleAll">Copy this graph shading to all</button><button type="button" id="csClearStyle">Clear shading</button></div>',
+ '</details></div>',
+ '<div class="cs-panel cs-download-panel"><h3>3 · Download</h3><p class="cs-muted">The default download includes only the selected graphs, three per page, in an editable Word document.</p>',
+ '<div class="cs-export-actions"><button type="button" class="cs-primary cs-download-main" id="csExportGraphs">Download Graphs (Word)</button><button type="button" id="csOpenFullReport">Complete Word Report…</button></div>',
+ '<p class="cs-mini">The minimum-load line is a visual reference, not an independent certification decision.</p>',
+ '<details class="cs-advanced"><summary>Save or restore setup</summary><div class="cs-toolbar"><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div></details>',
+ '<p class="cs-mini">The original LineScale workflow remains separate below.</p></div>',
+ '<dialog id="csFullReportDialog" class="cs-full-report-dialog" aria-labelledby="csFullReportHeading"><h3 id="csFullReportHeading">Complete Word Report</h3>',
+ '<p class="cs-muted">Review or edit the project information below. These fields are used only in the complete Word report. Graph-only downloads do not require them.</p>',
  '<div class="cs-fields" id="csProjectFields"></div>',
  '<div class="cs-toolbar"><label>Site plan / diagram (optional)<input id="csPlanFile" type="file" accept="image/png,image/jpeg"></label><span class="cs-muted" id="csPlanName">No diagram selected</span></div>',
- '</details>',
- '<div class="cs-panel"><h3>4 · Export reports</h3>',
- '<div class="cs-report-controls">',
- '<label>Graphs per page<select id="csPerPage"><option value="2">2 · larger graphs</option><option value="3" selected>3 · compact graphs</option></select></label></div>',
- '<p class="cs-muted">The minimum line is a visual reference, not a certification decision. Use Include to select which recordings appear in the exports. Graphs-only exports omit the introductory pages in either format; complete reports include project fields, anchor summary and graph evidence.</p>',
- '<div class="cs-report-controls" aria-label="Export format and content"><label>File format<select id="csExportFormat"><option value="word">Word (.docx)</option><option value="pdf">PDF (.pdf)</option></select></label><label>Report content<select id="csExportContent"><option value="complete">Complete report</option><option value="graphs">Graphs only</option></select></label></div>',
- '<div class="cs-export"><button type="button" class="cs-primary" id="csExport">Export Word — Complete report</button><button type="button" id="csSavePreset">Save report setup (.json)</button><button type="button" id="csLoadPreset">Load report setup</button><input id="csPresetFile" type="file" accept=".json,application/json" hidden></div>',
- '<p class="cs-mini">The original LineScale importer, calculations, and reports continue below this separate section.</p></div>'
+ '<p class="cs-status" id="csFullReportStatus" role="status" aria-live="polite"></p>',
+ '<div class="cs-export-actions"><button type="button" id="csCancelFullReport">Cancel</button><button type="button" class="cs-primary" id="csExportFullReport">Download Complete Word Report</button></div></dialog>'
  ].join("");
  hero.insertAdjacentElement("afterend",box);
  var fieldRoot=$("csProjectFields");
@@ -317,7 +319,7 @@ function applyCrosbyAxisInputs(){
 
 function crosbyTickStep(viewSpan,chartWidth){
  var desired=viewSpan/Math.max(6,Math.floor((chartWidth||720)/32));
- var steps=[.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
+ var steps=[.005,.01,.02,.05,.1,.2,.25,.5,1,2,5,10,20,30,60,120,300,600,1200];
  for(var i=0;i<steps.length;i++)if(steps[i]>=desired-1e-7)return steps[i];
  return Math.ceil(desired/1200)*1200;
 }
@@ -413,7 +415,7 @@ function refresh(){
  renderRows();
  if(selected())preview(S.current);else draw();
  $("csPrevious").disabled=S.tests.length<2;$("csNext").disabled=S.tests.length<2;
- ["csExport","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
+ ["csExportGraphs","csOpenFullReport","csExportFullReport","csPng","csStyleAll","csWindow","csSnapMarkers"].forEach(function(id){$(id).disabled=!S.tests.length;});
  var autoBtn=document.querySelector('#csWorkflow [data-cs-view="autoscale"]');
  if(autoBtn)autoBtn.disabled=!S.tests.length;
 }
@@ -600,10 +602,7 @@ async function loadPreset(file){
   if(obj.schema!=="tag-crosby-report-v1"||!obj.project)throw Error("Not a TAG Crosby setup file");
   Object.keys(project).forEach(function(k){if(Object.prototype.hasOwnProperty.call(obj.project,k))project[k]=obj.project[k];});
   fieldMap.forEach(function(f){setControl("csField_"+f[0],project[f[0]]||"");});
-  setControl("csTarget",project.minimum);setControl("csHold",project.hold);setControl("csPerPage",project.graphsPerPage);
-  setControl("csExportFormat",project.exportFormat==="pdf"?"pdf":"word");
-  setControl("csExportContent",project.exportContent==="graphs"?"graphs":"complete");
-  updateExportChoice();
+  setControl("csTarget",project.minimum);setControl("csHold",project.hold);
   (obj.tests||[]).forEach(function(saved){
    var current=S.tests.find(function(t){return t.id===saved.id&&t.name===saved.name;})||S.tests.find(function(t){return t.id===saved.id;});
    if(!current)return;
@@ -874,7 +873,7 @@ function dataBytes(url){
 }
 async function exportWord(content){
  var complete=content==="complete",tests=ordered();
- if(!tests.length){status("Include at least one Crosby recording.",true);return;}
+ if(!tests.length){status("Include at least one Crosby recording.",true);return false;}
  try{
   status("Preparing "+tests.length+" graphs and editable report fields for Word…");
   await loadLibrary("https://unpkg.com/docx@9.5.1/dist/index.iife.js","docx");
@@ -919,7 +918,7 @@ async function exportWord(content){
    }));
   }
   // Preserve the existing 2/3-graph export layout and all editable notes.
-  var per=project.graphsPerPage===3?3:2;
+  var per=3;
   tests.forEach(function(t,i){
    var img=images[i];
    ch.push(tagP(d,[tagRun(d,"Test "+(isMapped(t)?t.anchor:t.id)+" — "+(t.title||"Unassigned"),{font:"Arial",size:22,bold:true})],{
@@ -948,7 +947,8 @@ async function exportWord(content){
   if(magic[0]!==80||magic[1]!==75)throw Error("The Word document package is not a valid ZIP/DOCX.");
   download(blob,fileStem()+(complete?"_complete":"_graphs")+".docx");
   status((complete?"Complete editable Word report":"Graph-only Word document")+" exported with "+tests.length+" Crosby test graphs.");
- }catch(e){console.error(e);status("Word export failed: "+e.message,true);}
+  return true;
+ }catch(e){console.error(e);status("Word export failed: "+e.message,true);return false;}
 }
 function example(){
  var lines=["Start Shift, Finish Shift","12-November-2026 08:00:00,12-November-2026 08:01:00","Start Shift, Datalog Type, Project Details, Latitude, Longitude, Underload Count, Overload Count, Total Weight","EXAMPLE, timed, csl, 0,0,0,0,3100","Device, Log Date, Time, Value, Unit, Underloaded, Overloaded"];
@@ -960,20 +960,27 @@ function example(){
  S.tests.push(t);refresh();status("Illustrative example added. Remove it before producing an actual report.");
 }
 
-function updateExportChoice(){
- var format=$("csExportFormat")?.value||"word",content=$("csExportContent")?.value||"complete";
- var button=$("csExport");
- if(button)button.textContent="Export "+(format==="pdf"?"PDF":"Word")+" — "+(content==="graphs"?"Graphs only":"Complete report");
+function openCompleteReport(){
+ var dlg=$("csFullReportDialog");if(!dlg)return;
+ $("csFullReportStatus").textContent="";
+ if(typeof dlg.showModal==="function")dlg.showModal();
+ else dlg.setAttribute("open","");
 }
-async function exportSelected(){
- var button=$("csExport");if(!button||button.disabled)return;
- var format=$("csExportFormat").value,content=$("csExportContent").value;
- if(!["word","pdf"].includes(format)||!["graphs","complete"].includes(content)){
-  status("Choose a valid format and content option.",true);return;
- }
+function closeCompleteReport(){
+ var dlg=$("csFullReportDialog");if(!dlg)return;
+ if(typeof dlg.close==="function")dlg.close();
+ else dlg.removeAttribute("open");
+}
+async function downloadWord(mode,id){
+ var button=$(id);if(!button||button.disabled||!ordered().length)return;
  button.disabled=true;
- try{if(format==="pdf")await exportPDF(content);else await exportWord(content);}
- finally{button.disabled=!S.tests.length;}
+ try{
+  var success=await exportWord(mode);
+  if(mode==="complete"){
+   if(success)closeCompleteReport();
+   else $("csFullReportStatus").textContent=$("csStatus")?.textContent||"Unable to export the report.";
+  }
+ }finally{button.disabled=!S.tests.length;}
 }
 
 function bind(){
@@ -1019,16 +1026,11 @@ function bind(){
  }
  $("csTarget").addEventListener("input",function(){project.minimum=Math.max(0,numeric("csTarget",3000));criteriaChanged();});
  $("csHold").addEventListener("input",function(){project.hold=Math.max(0,numeric("csHold",10));criteriaChanged();});
- $("csPerPage").addEventListener("change",function(){project.graphsPerPage=Number(this.value)||2;});
  $("csPng").addEventListener("click",async function(){if(!selected())return;try{download(new Blob([dataBytes(await graphPNG(selected()))],{type:"image/png"}),safeName(selected().title)+"_graph.png");}catch(e){status("Graph PNG export failed: "+e.message,true);}});
- ["csExportFormat","csExportContent"].forEach(function(id){
-  $(id).addEventListener("change",function(){
-   project.exportFormat=$("csExportFormat").value;
-   project.exportContent=$("csExportContent").value;
-   updateExportChoice();
-  });
- });
- $("csExport").addEventListener("click",exportSelected);
+ $("csExportGraphs").addEventListener("click",function(){return downloadWord("graphs","csExportGraphs");});
+ $("csOpenFullReport").addEventListener("click",openCompleteReport);
+ $("csCancelFullReport").addEventListener("click",closeCompleteReport);
+ $("csExportFullReport").addEventListener("click",function(){return downloadWord("complete","csExportFullReport");});
  $("csSavePreset").addEventListener("click",savePreset);
  $("csLoadPreset").addEventListener("click",function(){$("csPresetFile").click();});
  $("csPresetFile").addEventListener("change",function(){loadPreset(this.files?.[0]);this.value="";});
@@ -1041,9 +1043,6 @@ function bind(){
    $("csPlanName").textContent=f.name+" (included in Word report)";
   }catch(e){status("Could not load the site diagram: "+e.message,true);}
  });
- setControl("csExportFormat",project.exportFormat);
- setControl("csExportContent",project.exportContent);
- updateExportChoice();
  dragBind();refresh();
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install);else install();
