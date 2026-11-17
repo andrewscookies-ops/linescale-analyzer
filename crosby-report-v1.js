@@ -443,7 +443,13 @@ function renderRows(){
 }
 function preview(i){
  if(!S.tests.length)return;
- S.current=Math.max(0,Math.min(S.tests.length-1,i));
+ var next=Math.max(0,Math.min(S.tests.length-1,i));
+ // Step 1 View is only a selection action. Reopening the currently displayed
+ // recording must not recreate its chart or change any live view/annotations.
+ if(next===S.current&&S.chart&&S.chart.$crosby===S.tests[next])return;
+ S.current=next;
+ // Each test owns its X/Y window, marker coordinates and shading. Selecting a
+ // different test displays that saved state; it never recalculates/reset it.
  loadStyle();renderRows();draw();
 }
 function refresh(){
