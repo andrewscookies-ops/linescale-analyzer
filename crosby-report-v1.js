@@ -928,7 +928,11 @@ function example(){
   // Smoothstep release starts at 33 s, without a sharp corner at 34–35 s.
   var release=Math.min(1,Math.max(0,(i-33)/12));
   var releaseFraction=release*release*(3-2*release);
+  // Ease into the pull over the first three seconds, then meet the same
+  // 310 lb/second ramp with no hard corner at the handoff.
+  var ramp=(i-10)/3;
   var force=i<10?30+18*Math.sin(i*1.1):
+   i<13?40+930*ramp*ramp*(2-ramp):
    i<20?40+(i-10)*310:
    i<=33?3060+45*Math.sin((i-20)/3):
    Math.max(0,(3060+45*Math.sin(13/3))*(1-releaseFraction));
