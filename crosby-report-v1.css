@@ -87,3 +87,8 @@
  #csWorkflow .cs-full-report-dialog{padding:14px}
  #csWorkflow .cs-full-report-dialog .cs-export-actions button{flex:1 1 100%}
 }
+
+/* Contextual marker reset: visually secondary to the graph tools. */
+#csWorkflow .cs-marker-actions{margin:-3px 0 10px;display:flex;justify-content:flex-start}
+#csWorkflow #csWindow{font-size:12px;line-height:1.4;color:#b9d9d1;background:transparent;border-color:transparent;padding:5px 7px}
+#csWorkflow #csWindow:hover:not(:disabled){color:#e9fff7;background:#1c3336;border-color:#365750}
