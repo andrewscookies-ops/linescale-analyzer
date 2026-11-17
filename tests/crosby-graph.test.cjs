@@ -761,6 +761,34 @@ test('markers remain freely draggable after a one-time Snap action', () => {
   assert.deepEqual(plain(t.view), { xmin: 0, xmax: 10, ymin: 0, ymax: 4000 });
 });
 
+test('default Crosby graph shows integer-second and integer-pound labels, without decimal ticks', () => {
+  const h=load();
+  const t=select(h,h.parseCrosby('example-whole-seconds.csv',csv()));
+  const x=h.S.chart.options.scales.x.ticks;
+  const y=h.S.chart.options.scales.y.ticks;
+  assert.equal(x.stepSize,1);
+  assert.equal(x.precision,0);
+  assert.equal(y.precision,0);
+  assert.equal(x.callback.call({min:0,max:120},20),'20');
+  assert.equal(x.callback.call({min:0,max:120},20.5),'',
+    'Default display must not label fractional seconds');
+  assert.equal(y.callback(1000),'1,000');
+  assert.equal(y.callback(1000.5),'',
+    'Default force axis must not label fractional pounds');
+  h.crosbyAction('reset');
+  assert.equal(h.S.chart.options.scales.x.ticks.precision,0);
+  assert.equal(h.S.chart.options.scales.x.ticks.stepSize,1);
+  h.crosbyAction('in');
+  assert.equal(h.S.chart.options.scales.x.ticks.precision,0,
+    'Regular zoom must keep whole-second ticks');
+  const detailed=h.graphConfig(recording(h,{view:{xmin:10,xmax:10.8,ymin:0,ymax:4000}}),720);
+  const dt=detailed.options.scales.x.ticks;
+  assert.ok(dt.stepSize<1);
+  assert.equal(dt.precision,3);
+  assert.equal(dt.callback.call({min:10,max:10.8},10.25),'10.25',
+    'Fractions remain visible under a 1-second zoom');
+});
+
 test('adaptive tick spacing and sample dots still respond to zoom and width', () => {
   const h = load(), t = recording(h, { view: { xmin: 0, xmax: 16, ymin: 0, ymax: 4000 } });
   const config = h.graphConfig(t, 720), radius = config.data.datasets[0].pointRadius;
