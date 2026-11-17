@@ -465,37 +465,79 @@ test('Graph View has only controls, with no explanatory text or wheel/pinch axis
   assert.deepEqual(plain(t.style),before,'Zoom must not move markers or alter shading');
 });
 
-test('example starts with 11 low-tension readings, eases to 3100 lb, holds 13 s and unloads rapidly', () => {
-  const h=load();
-  h.get('csDemo').click();
-  const t=h.S.tests[0],points=t.points,ys=points.map(p=>p.y);
-  assert.ok(t&&t.title.includes('NOT a test'));
-  assert.equal(points.length,55);
-  assert.deepEqual(plain(points.slice(0,11).map(p=>p.x)),Array.from({length:11},(_,i)=>i));
-  assert.ok(ys.slice(0,11).every(y=>y>=18&&y<=32),'Pre-pull tension stays around 25 lb for 11 seconds');
-  assert.ok(ys[11]-ys[10]<20,'Initial pull must begin gently');
-  assert.ok(ys.slice(11,30).every((y,i)=>i===0||y>=ys[10+i]),
-    'The loading phase must increase continuously');
-  assert.ok(ys[27]-ys[26]>ys[28]-ys[27]&&ys[28]-ys[27]>ys[29]-ys[28],
-    'Loading must slow smoothly as it approaches 3100 lb');
-  assert.equal(ys[29],3100);
-  assert.ok(ys.slice(29,42).every(y=>y>=3050&&y<=3130),
-    'The held load should remain close to 3100 lb through 41 s');
-  const above=points.filter(p=>p.y>=h.project.minimum);
-  assert.equal(above[0].x,28);
-  assert.equal(above.at(-1).x,41);
-  assert.equal(above.at(-1).x-above[0].x,13,'Observed continuous hold should last 13 seconds');
-  assert.ok(ys.slice(42,47).every((y,i)=>y<ys[41+i]),
-    'Unloading must drop rapidly and continuously from 41–46 s');
-  assert.ok(ys[46]<=25,'The release should reach close to zero within five seconds');
-  assert.ok(ys.slice(47).every(y=>y>=10&&y<=30),'Return to low tension after release');
-  assert.equal(t.style.showA,true,'Qualifying hold must be detected');
-  assert.equal(t.style.showB,true);
-  assert.deepEqual([t.style.a,t.style.b],[28,38],'Markers follow the first qualifying 10 s hold');
-  const initial=plain(t.view);
+test('each example preserves the realistic shape but varies 10–15 s lead-in and 12–15 s passing hold', () => {
+  const h=load(),seenNames=new Set(),seenCurves=new Set(),examples=[];
+  for(let j=0;j<24;j++){
+    h.get('csDemo').click();
+    const t=h.S.tests.at(-1),ys=t.points.map(p=>p.y),profile=t.demoProfile;
+    assert.equal(h.S.current,j,'Loading an example must immediately display the newly added curve');
+    assert.ok(t&&t.title.includes('NOT a test'));
+    assert.ok(!seenNames.has(t.name),'Every example must have its own name for navigation');
+    seenNames.add(t.name);
+    const fingerprint=ys.join(',');
+    assert.ok(!seenCurves.has(fingerprint),'Examples must show recognizably different measurement curves');
+    seenCurves.add(fingerprint);
+    assert.ok(profile.lowSeconds>=10&&profile.lowSeconds<=15,
+      'Pre-pull lead-in must vary from 10 to 15 seconds');
+    assert.ok(profile.holdSeconds>=12&&profile.holdSeconds<=15,
+      'Hold length must vary from 12 to 15 seconds');
+    assert.ok(profile.riseSeconds>=17&&profile.riseSeconds<=22);
+    assert.ok(profile.releaseSeconds>=4&&profile.releaseSeconds<=6);
+    assert.deepEqual(plain(t.points.map(p=>p.x)),
+      Array.from({length:t.points.length},(_,i)=>i),'Examples must use real 1-second samples');
+    const low=ys.slice(0,profile.lowSeconds);
+    assert.ok(low.every(y=>y>=15&&y<=35),'Lead-in stays around 25 lb');
+    const rampEnd=profile.lowSeconds+profile.riseSeconds;
+    assert.ok(ys[rampEnd]>3000,'Gradual pull must reach the required load');
+    const rampMiddle=ys[profile.lowSeconds+Math.floor(profile.riseSeconds/2)];
+    assert.ok(rampMiddle>1100&&rampMiddle<2000,'Pull preserves its eased ascent');
+    assert.ok(t.peak>=3050&&t.peak<=3180,'Peak remains close to 3,100 lb');
+    const qualifying=t.points.filter(p=>p.y>=h.project.minimum);
+    const first=qualifying[0].x,last=qualifying.at(-1).x;
+    assert.equal(last-first,profile.holdSeconds,
+      'Measured uninterrupted time above 3,000 lb must equal the selected 12–15 second hold');
+    assert.equal(qualifying.length,profile.holdSeconds+1,
+      'Every 1 Hz reading during the qualifying hold must remain above 3,000 lb');
+    assert.ok(ys[last+1]<h.project.minimum,'First unloading sample must end the qualifying hold');
+    assert.ok(ys[last+profile.releaseSeconds]<=35,
+      'Release reaches about 25 lb within 4–6 seconds');
+    assert.equal(t.style.showA,true,'Every example must qualify for marker A');
+    assert.equal(t.style.showB,true,'Every example must qualify for marker B');
+    assert.equal(t.style.a,first,'A marker must begin at the first passing measurement');
+    assert.equal(t.style.b,first+h.project.hold,
+      'B marker must mark the requested 10-second interval inside the passing hold');
+    assert.ok(t.style.b<=last,'B must remain inside the passing hold');
+    assert.ok(!h.get('csStats').innerHTML.includes('No qualifying'),
+      'Examples must not display a failed hold warning');
+    examples.push({t,profile});
+  }
+  assert.equal(h.S.tests.length,24);
+  assert.equal(seenCurves.size,24);
+  assert.equal(seenNames.size,24);
+  const last=h.S.tests.at(-1);
+  h.get('csNext').click();
+  assert.equal(h.S.current,0,'Next wraps from last example to the first');
+  assert.notEqual(h.S.chart.$crosby,last,'Navigation should visibly switch to a different curve');
+  h.get('csPrevious').click();
+  assert.equal(h.S.chart.$crosby,last,'Previous returns to the last example');
+  assert.ok(examples.every(({t})=>t.style.showA&&t.style.showB));
+  const original=plain(last.view);
   h.crosbyAction('autoscale');
-  assert.equal(t.view.xmax-t.view.xmin,30,'Auto Scale should focus around the detected hold');
-  assert.ok(initial.xmax>t.view.xmax-t.view.xmin,'Auto Scale must narrow the example graph');
+  assert.equal(last.view.xmax-last.view.xmin,30,'Auto Scale still focuses around a passing hold');
+  assert.ok(original.xmax>30,'Full example stays visibly wider than Auto Scale');
+});
+
+test('demo button respects 50-recording limit while preserving all generated examples', () => {
+  const h=load();
+  for(let i=0;i<50;i++)h.get('csDemo').click();
+  const names=h.S.tests.map(t=>t.name);
+  assert.equal(new Set(names).size,50,'The 50 examples must each have a distinct CSV name');
+  assert.ok(h.S.tests.every(t=>t.style.showA&&t.style.showB),
+    'Every example must pass the default minimum-load and hold-duration checks');
+  h.get('csDemo').click();
+  assert.equal(h.S.tests.length,50);
+  assert.deepEqual(plain(h.S.tests.map(t=>t.name)),plain(names));
+  assert.match(h.get('csStatus').textContent,/50-recording limit/);
 });
 
 test('Previous, Next, Auto Scale, and Reset / Fit scroll with the sticky graph', () => {
