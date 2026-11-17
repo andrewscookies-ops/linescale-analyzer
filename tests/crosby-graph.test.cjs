@@ -150,6 +150,19 @@ test('initial imported view is identical to Reset / Fit with marker positions un
   assert.deepEqual(plain(t.style),markerBefore,'Reset / Fit must not touch A/B');
 });
 
+test('Advanced Controls and Shading Options stack vertically at the right of the graph', () => {
+  const css=fs.readFileSync(`${__dirname}/../crosby-report-v1.css`,'utf8');
+  assert.ok(css.includes('.cs-graph-workspace{'), 'Graph and inspector must share a workspace');
+  assert.ok(css.includes('grid-template-columns:minmax(0,1fr) minmax(330px,375px)'),
+    'Desktop inspector should remain to the right of graph');
+  assert.ok(css.includes('.cs-inspector-options{display:grid;grid-template-columns:minmax(0,1fr)'),
+    'Advanced and Shading dropdowns must use a single stacked column');
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const advanced=source.indexOf('<details class="cs-advanced"><summary>Advanced controls</summary>');
+  const shading=source.indexOf('<details class="cs-advanced"><summary>Shading options</summary>');
+  assert.ok(advanced>=0&&shading>advanced, 'Advanced Controls must appear above Shading Options');
+});
+
 test('Graph View stays collapsed inside Advanced Controls beside Shading Options', () => {
   const source=fs.readFileSync(sourcePath,'utf8');
   const options=source.indexOf('<div class="cs-inspector-options">');
