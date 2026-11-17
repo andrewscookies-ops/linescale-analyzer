@@ -199,3 +199,7 @@
   flex-basis:88px;width:88px;max-width:88px;
  }
 }
+
+
+/* Navigation and scale controls travel as part of the sticky plot column. */
+#csWorkflow .cs-plot-column>.cs-main-tools{margin:0 0 10px;align-items:center;gap:7px}
