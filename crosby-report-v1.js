@@ -111,6 +111,9 @@ function parseCrosby(name,text){
  anchor:num&&num<=999?num:null,title:num?"Anchor "+num:"Unassigned anchor",
  rating:"Pending review",comments:"",style:template(),enabled:true,view:null,markerManual:false};
  placeAutomaticMarkers(t,true);
+ // A new recording must start in precisely the same full view as Reset / Fit.
+ // Loading a saved setup may intentionally override this per-recording view.
+ t.view=fitCrosbyView(t);
  return t;
 }
 function holdStats(t,threshold){
