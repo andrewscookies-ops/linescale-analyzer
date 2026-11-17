@@ -361,6 +361,23 @@ test('Word Report Content fields live only inside an on-demand modal', () => {
   assert.equal(dialog.open, false);
 });
 
+test('download area contains only the two Word actions, without footnotes or setup tools', () => {
+  const source=fs.readFileSync(sourcePath,'utf8');
+  const start=source.indexOf('<div class="cs-panel cs-download-panel">');
+  const finish=source.indexOf('<dialog id="csFullReportDialog"',start);
+  assert.ok(start>=0 && finish>start,'Find the complete download panel');
+  const panel=source.slice(start,finish);
+  assert.match(panel,/id="csExportGraphs"/);
+  assert.match(panel,/id="csOpenFullReport"/);
+  assert.doesNotMatch(panel,/The minimum-load line|The original LineScale workflow|Save or restore setup|csSavePreset|csLoadPreset|csPresetFile/);
+  assert.doesNotMatch(source,/function savePreset|function loadPreset|csSavePreset|csLoadPreset|csPresetFile/);
+  const h=load();
+  assert.ok(h.get('csExportGraphs'));
+  assert.ok(h.get('csOpenFullReport'));
+  assert.equal(h.get('csSavePreset'),undefined);
+  assert.equal(h.get('csLoadPreset'),undefined);
+});
+
 test('Crosby workflow defaults to graph-only Word and removes PDF and page-count controls', () => {
   const h = load(), source = fs.readFileSync(sourcePath,'utf8');
   assert.ok(h.get('csExportGraphs'));
