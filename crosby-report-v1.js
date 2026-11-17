@@ -426,7 +426,11 @@ function draw(){
  if(typeof Chart==="undefined"){status("Chart.js is unavailable. Check network access.",true);return;}
  $("csGraphHeading").textContent="2 · "+(t.title||"Anchor") + " — Crosby log "+t.id;
  refreshCrosbyStats(t);
- S.chart=new Chart(canvas,graphConfig(t));S.chart.$crosby=t;S.chart.update("none");syncCrosbyAxisInputs(t);
+ S.chart=new Chart(canvas,graphConfig(t));S.chart.$crosby=t;
+ // Initial render must follow exactly the same axis/tick update path as
+ // Reset / Fit. Each imported graph starts with fitCrosbyView(t), while
+ // manually edited/saved views remain intact on later previews.
+ setCrosbyView(crosbyView(t));
 }
 function renderRows(){
  var host=$("csRows");if(!host)return;
