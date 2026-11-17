@@ -396,6 +396,48 @@ test('tan A/B band is enabled by default but shading controls stay collapsed', (
   assert.ok(h.get('csClearStyle'),'Clear shading must remain available');
 });
 
+test('Graph View has only controls, with no explanatory text or wheel/pinch axis selector', () => {
+  const src=fs.readFileSync(sourcePath,'utf8'),css=fs.readFileSync(__dirname+'/../crosby-report-v1.css','utf8');
+  const advanced=src.indexOf('<details class="cs-advanced"><summary>Advanced controls</summary>');
+  const graphView=src.indexOf('<section class="cs-axis-controller"',advanced);
+  const zoom=src.indexOf('class="cs-zoom-row"',graphView);
+  const sectionEnd=src.indexOf(" '</section>',",graphView);
+  assert.ok(advanced>=0 && graphView>advanced && zoom>graphView && sectionEnd>zoom,
+    'Arrow pad, X/Y bounds and zoom controls belong in Advanced Graph View');
+  assert.ok(css.includes('.cs-zoom-buttons'), 'Zoom pair should remain styled inside Graph View');
+  assert.doesNotMatch(src,/Tap arrows or edit bounds|cs-pad-help|Wheel\/pinch axes|csViewAxis/);
+  assert.equal(src.includes('data-cs-view="in"'),true);
+  assert.equal(src.includes('data-cs-view="out"'),true);
+  assert.doesNotMatch(src,/cs-main-tools[^\n]*data-cs-view="in"/);
+  const h=load(),t=select(h,recording(h, {view:{xmin:0,xmax:120,ymin:0,ymax:4000}}));
+  const before=plain(t.style);
+  h.crosbyAction('in');
+  assert.deepEqual(plain(t.view),{xmin:12,xmax:108,ymin:400,ymax:3600});
+  h.crosbyAction('out');
+  assert.deepEqual(plain(t.view),{xmin:0,xmax:120,ymin:0,ymax:4000});
+  assert.deepEqual(plain(t.style),before,'Zoom must not move markers or alter shading');
+});
+
+test('sample recording provides ten measured 10–50 lb seconds before the pull', () => {
+  const h=load();
+  h.get('csDemo').click();
+  const t=h.S.tests[0];
+  assert.ok(t&&t.title.includes('NOT a test'));
+  assert.equal(t.points.length,46);
+  assert.deepEqual(t.points.slice(0,10).map(p=>p.x),[0,1,2,3,4,5,6,7,8,9]);
+  assert.ok(t.points.slice(0,10).every(p=>p.y>=10&&p.y<=50),
+    'All pre-pull tension samples must be within 10–50 lb');
+  assert.ok(t.points.slice(11,20).some(p=>p.y>=500),
+    'The pull should begin after the initial low-tension period');
+  assert.equal(t.style.showA,true,'Qualifying hold must be found in the demo');
+  assert.equal(t.style.showB,true);
+  const firstView=plain(t.view);
+  h.crosbyAction('autoscale');
+  assert.equal(t.view.xmax-t.view.xmin,30,'Auto Scale should focus to the 10-second hold plus context');
+  assert.ok(firstView.xmax>t.view.xmax-t.view.xmin,
+    'Auto Scale should visibly narrow the wider example recording');
+});
+
 test('main graph toolbar only shows essential controls and zoom adapts time markings', () => {
   const h=load(),source=fs.readFileSync(sourcePath,'utf8');
   assert.match(source,/class="cs-toolbar cs-main-tools"/);
