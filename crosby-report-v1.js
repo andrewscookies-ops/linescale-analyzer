@@ -920,27 +920,23 @@ async function exportWord(content){
 }
 function example(){
  var lines=["Start Shift, Finish Shift","12-November-2026 08:00:00,12-November-2026 08:01:00","Start Shift, Datalog Type, Project Details, Latitude, Longitude, Underload Count, Overload Count, Total Weight","EXAMPLE, timed, csl, 0,0,0,0,3100","Device, Log Date, Time, Value, Unit, Underloaded, Overloaded"];
- // Demonstrate a realistic pre-pull interval: the first ten 1 Hz readings
- // fluctuate gently between 10 and 50 lb before tension starts increasing.
- // This makes the default full view visibly different from Auto Scale, which
- // focuses around the automatically identified qualifying hold.
- for(var i=0;i<46;i++){
-  // Smoothstep release starts at 33 s, without a sharp corner at 34–35 s.
-  var release=Math.min(1,Math.max(0,(i-33)/12));
-  var releaseFraction=release*release*(3-2*release);
-  // Ease into the pull over the first three seconds, then meet the same
-  // 310 lb/second ramp with no hard corner at the handoff.
-  var ramp=(i-10)/3;
-  var force=i<10?30+18*Math.sin(i*1.1):
-   i<13?40+930*ramp*ramp*(2-ramp):
-   i<20?40+(i-10)*310:
-   i<=33?3060+45*Math.sin((i-20)/3):
-   Math.max(0,(3060+45*Math.sin(13/3))*(1-releaseFraction));
+ // A 1 Hz illustrative load test: 11 s near 25 lb, a gradually increasing
+ // pull that eases toward 3,100 lb, a stable 13 s qualifying hold, a brisk
+ // smooth release to almost zero, then several low-load readings.
+ var smoothstep=function(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
+ var lastHold=3090+12*Math.sin(12*.7);
+ for(var i=0;i<55;i++){
+  var force;
+  if(i<=10)force=25+4*Math.sin(i*.9)+2*Math.cos(i*.46);
+  else if(i<=29)force=25+3075*smoothstep((i-11)/18);
+  else if(i<=41)force=3090+12*Math.sin((i-29)*.7);
+  else if(i<=46)force=20+(lastHold-20)*(1-smoothstep((i-41)/5));
+  else force=20+4*Math.sin((i-46)*.75);
   lines.push("40554,12-November-2026,08:00:"+String(i).padStart(2,"0")+":00,"+Math.round(force)+",lb,No,No");
  }
  var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
  S.tests.push(t);refresh();
- status("Illustrative example added with 10 seconds of 10–50 lb pre-pull tension. Try Auto Scale to focus on the qualifying hold.");
+ status("Illustrative example added: 11 seconds near 25 lb, a gradual pull to about 3,100 lb, a 13-second hold, and a quick release. Try Auto Scale.");
 }
 
 function openCompleteReport(){
