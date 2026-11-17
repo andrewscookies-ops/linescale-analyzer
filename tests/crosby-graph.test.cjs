@@ -435,43 +435,37 @@ test('Graph View has only controls, with no explanatory text or wheel/pinch axis
   assert.deepEqual(plain(t.style),before,'Zoom must not move markers or alter shading');
 });
 
-test('sample recording provides ten measured 10–50 lb seconds before the pull', () => {
+test('example starts with 11 low-tension readings, eases to 3100 lb, holds 13 s and unloads rapidly', () => {
   const h=load();
   h.get('csDemo').click();
-  const t=h.S.tests[0];
+  const t=h.S.tests[0],points=t.points,ys=points.map(p=>p.y);
   assert.ok(t&&t.title.includes('NOT a test'));
-  assert.equal(t.points.length,46);
-  assert.deepEqual(plain(t.points.slice(0,10).map(p=>p.x)),[0,1,2,3,4,5,6,7,8,9]);
-  assert.ok(t.points.slice(0,10).every(p=>p.y>=10&&p.y<=50),
-    'All pre-pull tension samples must be within 10–50 lb');
-  assert.ok(t.points.slice(11,20).some(p=>p.y>=500),
-    'The pull should begin after the initial low-tension period');
-  const pull=t.points;
-  assert.ok(pull[10].y-pull[9].y<50,
-    'The low-tension lead-in should flow gently into the pull at 10 s');
-  assert.ok(pull[11].y>pull[10].y&&pull[12].y>pull[11].y&&pull[13].y>pull[12].y,
-    'The first three seconds of pulling must rise smoothly');
-  assert.ok(pull[11].y-pull[10].y<240,
-    'The initial pull should ease in rather than jump immediately to 310 lb/s');
-  assert.equal(pull[13].y,970,'The eased pull should meet the original straight ramp at 13 s');
-  assert.equal(pull[14].y-pull[13].y,310,
-    'After easing, the pull should resume the normal ramp speed');
-  const y33=t.points[33].y,y34=t.points[34].y,y35=t.points[35].y;
-  assert.ok(y33>y34&&y34>y35,
-    'Example must begin a continuous decline through 33, 34 and 35 seconds');
-  assert.ok(y33-y34>0&&y33-y34<100,
-    'The first second of unloading must have a gentle shoulder, not a sharp drop');
-  assert.ok(y34-y35>y33-y34&&y34-y35<200,
-    'Unloading should accelerate smoothly through 35 seconds');
-  assert.ok(t.points.slice(34).every((point,i,arr)=>i===0||point.y<=arr[i-1].y),
-    'The example must unload monotonically after the hold');
-  assert.equal(t.style.showA,true,'Qualifying hold must be found in the demo');
+  assert.equal(points.length,55);
+  assert.deepEqual(plain(points.slice(0,11).map(p=>p.x)),Array.from({length:11},(_,i)=>i));
+  assert.ok(ys.slice(0,11).every(y=>y>=18&&y<=32),'Pre-pull tension stays around 25 lb for 11 seconds');
+  assert.ok(ys[11]-ys[10]<20,'Initial pull must begin gently');
+  assert.ok(ys.slice(11,30).every((y,i)=>i===0||y>=ys[10+i]),
+    'The loading phase must increase continuously');
+  assert.ok(ys[27]-ys[26]>ys[28]-ys[27]&&ys[28]-ys[27]>ys[29]-ys[28],
+    'Loading must slow smoothly as it approaches 3100 lb');
+  assert.equal(ys[29],3100);
+  assert.ok(ys.slice(29,42).every(y=>y>=3050&&y<=3130),
+    'The held load should remain close to 3100 lb through 41 s');
+  const above=points.filter(p=>p.y>=h.project.minimum);
+  assert.equal(above[0].x,28);
+  assert.equal(above.at(-1).x,41);
+  assert.equal(above.at(-1).x-above[0].x,13,'Observed continuous hold should last 13 seconds');
+  assert.ok(ys.slice(42,47).every((y,i)=>y<ys[41+i]),
+    'Unloading must drop rapidly and continuously from 41–46 s');
+  assert.ok(ys[46]<=25,'The release should reach close to zero within five seconds');
+  assert.ok(ys.slice(47).every(y=>y>=10&&y<=30),'Return to low tension after release');
+  assert.equal(t.style.showA,true,'Qualifying hold must be detected');
   assert.equal(t.style.showB,true);
-  const firstView=plain(t.view);
+  assert.deepEqual([t.style.a,t.style.b],[28,38],'Markers follow the first qualifying 10 s hold');
+  const initial=plain(t.view);
   h.crosbyAction('autoscale');
-  assert.equal(t.view.xmax-t.view.xmin,30,'Auto Scale should focus to the 10-second hold plus context');
-  assert.ok(firstView.xmax>t.view.xmax-t.view.xmin,
-    'Auto Scale should visibly narrow the wider example recording');
+  assert.equal(t.view.xmax-t.view.xmin,30,'Auto Scale should focus around the detected hold');
+  assert.ok(initial.xmax>t.view.xmax-t.view.xmin,'Auto Scale must narrow the example graph');
 });
 
 test('main graph toolbar only shows essential controls and zoom adapts time markings', () => {
