@@ -42,14 +42,28 @@ const make=(id,anchor)=>({
 api.S.tests=Array.from({length:16},(_,i)=>make(i+1,i+1));
 api.project.minimum=3000;
 (async()=>{
- await api.exportWord('complete');
+ // Graphs-only is the prominent download and must not request project fields or TAG logo.
+ const graphExportOk=await api.exportWord('graphs');
+ assert.equal(graphExportOk,true,'Graph-only Word generation failed: '+statusNode.textContent);
+ const graphExport=sandbox.__saved;
+ assert.ok(graphExport);
+ assert.match(graphExport.name,/_graphs\.docx$/);
+ const graphBytes=Buffer.from(await graphExport.blob.arrayBuffer());
+ assert.ok(graphBytes.length>5000);
+ assert.equal(graphBytes.subarray(0,2).toString('utf8'),'PK');
+ const graphPath=process.argv[3]||path.join(root,'word-export-graphs-smoke.docx');
+ fs.writeFileSync(graphPath,graphBytes);
+ console.log('Generated graph-only DOCX: '+graphBytes.length+' bytes');
+
+ const completeOk=await api.exportWord('complete');
+ assert.equal(completeOk,true,'Complete Word generation failed: '+statusNode.textContent);
  const exported=sandbox.__saved;
  assert.ok(exported,'Word exporter failed: '+statusNode.textContent);
- assert.match(exported.name,/\.docx$/);
+ assert.match(exported.name,/_complete\.docx$/);
  const bytes=Buffer.from(await exported.blob.arrayBuffer());
  assert.ok(bytes.length>5000,'Unexpectedly small DOCX');
  assert.ok(exported.blob.type.includes('wordprocessingml'),'DOCX should have the Word MIME type');
  assert.equal(bytes.subarray(0,2).toString('utf8'),'PK');
  fs.writeFileSync(process.argv[2]||path.join(root,'word-export-smoke.docx'),bytes);
- console.log('Generated DOCX: '+bytes.length+' bytes');
+ console.log('Generated complete DOCX: '+bytes.length+' bytes');
 })().catch(e=>{console.error(e);process.exitCode=1;});
