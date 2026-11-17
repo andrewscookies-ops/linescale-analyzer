@@ -955,12 +955,20 @@ async function exportWord(content){
 }
 function example(){
  var lines=["Start Shift, Finish Shift","12-November-2026 08:00:00,12-November-2026 08:01:00","Start Shift, Datalog Type, Project Details, Latitude, Longitude, Underload Count, Overload Count, Total Weight","EXAMPLE, timed, csl, 0,0,0,0,3100","Device, Log Date, Time, Value, Unit, Underloaded, Overloaded"];
- for(var i=0;i<36;i++){
-  var force=i<10?i*310:i<24?3050+45*Math.sin(i/3):Math.max(0,3100-(i-24)*340);
+ // Demonstrate a realistic pre-pull interval: the first ten 1 Hz readings
+ // fluctuate gently between 10 and 50 lb before tension starts increasing.
+ // This makes the default full view visibly different from Auto Scale, which
+ // focuses around the automatically identified qualifying hold.
+ for(var i=0;i<46;i++){
+  var force=i<10?30+18*Math.sin(i*1.1):
+   i<20?40+(i-10)*310:
+   i<34?3060+45*Math.sin((i-20)/3):
+   Math.max(0,3100-(i-34)*310);
   lines.push("40554,12-November-2026,08:00:"+String(i).padStart(2,"0")+":00,"+Math.round(force)+",lb,No,No");
  }
  var t=parseCrosby("example-not-real.csv",lines.join("\n"));t.title="Example — NOT a test";t.anchor=null;
- S.tests.push(t);refresh();status("Illustrative example added. Remove it before producing an actual report.");
+ S.tests.push(t);refresh();
+ status("Illustrative example added with 10 seconds of 10–50 lb pre-pull tension. Try Auto Scale to focus on the qualifying hold.");
 }
 
 function openCompleteReport(){
