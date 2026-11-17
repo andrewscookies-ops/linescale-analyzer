@@ -171,3 +171,31 @@
  #csWorkflow .cs-zoom-row{flex-wrap:wrap}
  #csWorkflow .cs-zoom-buttons{max-width:none}
 }
+
+
+/* A/B marker inputs sit beneath (not inside) the Shading Options dropdown. */
+#csWorkflow .cs-markers-below-shading{
+ border:1px solid #304953;border-radius:10px;
+ background:#12242b;padding:10px 12px;min-width:0;
+}
+#csWorkflow .cs-inspector-options .cs-marker-controls{
+ display:grid;grid-template-columns:minmax(0,1fr);gap:8px;
+ max-width:none;margin:0;
+}
+#csWorkflow .cs-inspector-options .cs-marker-controls label{
+ display:flex;align-items:center;gap:5px;min-width:0;
+ font-size:12px;white-space:nowrap;
+}
+#csWorkflow .cs-inspector-options .cs-marker-controls input[type=number]{
+ display:block;flex:0 0 96px;width:96px;min-width:0;max-width:96px;
+ margin:0 0 0 auto;padding:6px 7px;font-size:12px;font-variant-numeric:tabular-nums;
+}
+#csWorkflow .cs-inspector-options .cs-marker-actions{
+ display:flex;justify-content:flex-end;margin:7px 0 0;
+}
+@media(max-width:520px){
+ #csWorkflow .cs-markers-below-shading{padding:9px}
+ #csWorkflow .cs-inspector-options .cs-marker-controls input[type=number]{
+  flex-basis:88px;width:88px;max-width:88px;
+ }
+}
