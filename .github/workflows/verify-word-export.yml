@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'crosby-report-v1.js'
+      - 'crosby-report-v1.css'
       - 'assets/tag-logo.base64'
       - 'tests/word-export.integration.cjs'
       - 'tests/crosby-graph.test.cjs'
@@ -22,33 +23,41 @@ jobs:
       - name: Existing Crosby regression suite
         run: node tests/crosby-graph.test.cjs
       - name: Generate real DOCX using app exporter
-        run: node tests/word-export.integration.cjs /tmp/crosby-word.docx
-      - name: Verify DOCX relationships and XML
+        run: node tests/word-export.integration.cjs /tmp/crosby-word.docx /tmp/crosby-graphs.docx
+      - name: Verify both DOCX containers, contents, and three graphs per page
         run: |
           python3 - <<'PY'
           import zipfile,xml.etree.ElementTree as ET
-          p='/tmp/crosby-word.docx'
-          with zipfile.ZipFile(p) as z:
-              assert z.testzip() is None
-              assert '[Content_Types].xml' in z.namelist()
-              assert 'word/document.xml' in z.namelist()
-              for name in z.namelist():
-                  if name.endswith('.xml') or name.endswith('.rels'):
-                      ET.fromstring(z.read(name))
-              doc=z.read('word/document.xml')
-              assert b'Ground Anchor Testing' in doc
-              assert b'3,000 lbs' in doc
-              assert b'www.theadventureguild.com' in doc
-              assert any(n.startswith('word/media/') for n in z.namelist())
-          print('DOCX ZIP, all embedded XML and relationships are well-formed.')
+          ns={'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+          for path,complete in [('/tmp/crosby-word.docx', True),('/tmp/crosby-graphs.docx',False)]:
+              with zipfile.ZipFile(path) as z:
+                  assert z.testzip() is None, path
+                  assert '[Content_Types].xml' in z.namelist()
+                  assert 'word/document.xml' in z.namelist()
+                  for name in z.namelist():
+                      if name.endswith('.xml') or name.endswith('.rels'):
+                          ET.fromstring(z.read(name))
+                  doc=z.read('word/document.xml')
+                  root=ET.fromstring(doc)
+                  breaks=len(root.findall('.//w:pageBreakBefore', ns))
+                  assert breaks==(7 if complete else 5),(path,breaks)
+                  assert any(n.startswith('word/media/') for n in z.namelist())
+                  if complete:
+                      assert b'Ground Anchor Testing' in doc
+                      assert b'3,000 lbs' in doc
+                      assert b'www.theadventureguild.com' in doc
+                  else:
+                      assert b'www.theadventureguild.com' not in doc
+                  print(path,': valid DOCX and three-graph page grouping,',breaks,'explicit page breaks')
           PY
-      - name: Verify Word processor can import document
+      - name: Verify Word processor can import both document types
         run: |
           if ! command -v libreoffice >/dev/null; then
             sudo apt-get update -qq
             sudo apt-get install -y -qq libreoffice-writer
           fi
           mkdir -p /tmp/crosby-rendered
-          libreoffice -env:UserInstallation=file:///tmp/lo-crosby-ci --headless --convert-to pdf --outdir /tmp/crosby-rendered /tmp/crosby-word.docx
+          libreoffice -env:UserInstallation=file:///tmp/lo-crosby-ci --headless --convert-to pdf --outdir /tmp/crosby-rendered /tmp/crosby-word.docx /tmp/crosby-graphs.docx
           test -s /tmp/crosby-rendered/crosby-word.pdf
-          echo 'Word document opened and rendered successfully.'
+          test -s /tmp/crosby-rendered/crosby-graphs.pdf
+          echo 'Both Word documents opened and rendered successfully.'
