@@ -81,7 +81,8 @@ function load() {
     S, project, template, install, parseCrosby, crosbyView, graphConfig,
     refreshCrosbyStats, crosbyAction, refresh, importFiles, reportData,
     snapCrosbyMarkers: typeof snapCrosbyMarkers === 'function' ? snapCrosbyMarkers : undefined,
-    appliedLoadLabel, wordAnchorRows
+    appliedLoadLabel, wordAnchorRows,
+    fitCrosbyView, panCrosbyPad, applyCrosbyAxisInputs
   };\n`;
   assert.match(source, /\}\)\(\);\s*$/, 'Expected the module IIFE closing boundary');
   const context = vm.createContext({ document, Chart, console });
@@ -131,6 +132,73 @@ test('new recordings open across their full duration without changing markers', 
   assert.deepEqual([config.options.scales.x.min, config.options.scales.x.max], [0, 120]);
   assert.deepEqual(plain(t.style), before);
   assert.equal(t.view, null);
+});
+
+test('initial imported view is identical to Reset / Fit with marker positions untouched', () => {
+  const h=load(),t=h.parseCrosby('initial.csv',csv());
+  const expected={xmin:0,xmax:120,ymin:0,ymax:4000};
+  assert.deepEqual(plain(t.view),expected);
+  assert.deepEqual(plain(h.fitCrosbyView(t)),expected);
+  select(h,t);
+  assert.deepEqual([Number(h.get('csXStart').value),Number(h.get('csXEnd').value),
+    Number(h.get('csYMin').value),Number(h.get('csYMax').value)],[0,120,0,4000]);
+  const markerBefore=plain(t.style);
+  t.view={xmin:25,xmax:37,ymin:200,ymax:3200};
+  h.refresh();
+  h.crosbyAction('reset');
+  assert.deepEqual(plain(t.view),expected,'Reset / Fit must restore the original default');
+  assert.deepEqual(plain(t.style),markerBefore,'Reset / Fit must not touch A/B');
+});
+
+test('compact axis pad and editable X/Y limits stay synchronized with chart', () => {
+  const h=load(),t=select(h,recording(h));
+  const source=fs.readFileSync(sourcePath,'utf8');
+  assert.match(source,/class="cs-graph-workspace"/);
+  assert.match(source,/class="cs-graph-inspector"/);
+  assert.match(source,/class="cs-inspector-options"/);
+  assert.match(source,/data-cs-pan="up"/);
+  assert.match(source,/data-cs-pan="down"/);
+  assert.match(source,/data-cs-pan="left"/);
+  assert.match(source,/data-cs-pan="right"/);
+  assert.ok(source.indexOf('id="csTarget"')<source.indexOf('id="csGraphPanel"'));
+  assert.doesNotMatch(source,/Crosby Straightpoint · distinct workflow/);
+
+  const set=(id,v)=>{h.get(id).value=String(v);};
+  set('csXStart',20);set('csXEnd',40);set('csYMin',100);set('csYMax',2500);
+  h.applyCrosbyAxisInputs();
+  assert.deepEqual(plain(t.view),{xmin:20,xmax:40,ymin:100,ymax:2500});
+  assert.deepEqual([h.S.chart.options.scales.x.min,h.S.chart.options.scales.x.max,
+    h.S.chart.options.scales.y.min,h.S.chart.options.scales.y.max],[20,40,100,2500]);
+  h.panCrosbyPad('left');
+  assert.deepEqual(plain(t.view),{xmin:18,xmax:38,ymin:100,ymax:2500});
+  h.panCrosbyPad('right');
+  assert.deepEqual(plain(t.view),{xmin:20,xmax:40,ymin:100,ymax:2500});
+  h.panCrosbyPad('up');
+  assert.deepEqual(plain(t.view),{xmin:20,xmax:40,ymin:340,ymax:2740});
+  h.panCrosbyPad('down');
+  assert.deepEqual(plain(t.view),{xmin:20,xmax:40,ymin:100,ymax:2500});
+  assert.equal(Number(h.get('csYMax').value),2500);
+  set('csYMax',50);
+  h.applyCrosbyAxisInputs();
+  assert.deepEqual(plain(t.view),{xmin:20,xmax:40,ymin:100,ymax:2500},
+    'Invalid typed bounds should not alter graph');
+  h.crosbyAction('reset');
+  assert.deepEqual(plain(t.view),{xmin:0,xmax:120,ymin:0,ymax:4000});
+  assert.deepEqual([Number(h.get('csXStart').value),Number(h.get('csXEnd').value),
+    Number(h.get('csYMin').value),Number(h.get('csYMax').value)],[0,120,0,4000]);
+});
+
+test('Reset A/B only adjusts markers and leaves custom X and Y bounds intact', () => {
+  const h=load();
+  const points=[{x:0,y:0},...Array.from({length:12},(_,i)=>({x:i+1,y:3100})),{x:20,y:0}];
+  const custom={xmin:3,xmax:18,ymin:200,ymax:3600};
+  const t=select(h,recording(h,{points,duration:20,view:custom}));
+  t.markerManual=true; t.style.a=4; t.style.b=7;
+  h.get('csWindow').click();
+  assert.deepEqual(plain(t.view),custom,'A/B reset must not behave like Reset / Fit');
+  assert.deepEqual(markerTimes(t),[1,11]);
+  assert.deepEqual([Number(h.get('csXStart').value),Number(h.get('csXEnd').value),
+    Number(h.get('csYMin').value),Number(h.get('csYMax').value)],[3,18,200,3600]);
 });
 
 test('default import hides A/B markers unless the full required hold was measured', () => {
@@ -212,15 +280,15 @@ test('main graph toolbar only shows essential controls and zoom adapts time mark
   const h=load(),source=fs.readFileSync(sourcePath,'utf8');
   assert.match(source,/class="cs-toolbar cs-main-tools"/);
   assert.doesNotMatch(source,/data-cs-view="focus"|data-cs-view="left"|data-cs-view="right"|data-cs-view="up"|data-cs-view="down"/);
-  assert.match(source,/<details class="cs-advanced"><summary>Advanced graph controls<\/summary>/);
+  assert.match(source,/<details class="cs-advanced"><summary>Advanced controls<\/summary>/);
   assert.doesNotMatch(source,/id="csSnapMarkers"/);
   assert.match(source,/id="csWindow"/);
-  assert.match(source,/release near a recorded reading to snap precisely/);
+  assert.match(source,/release near a recorded time to snap/);
   const wide=recording(h,{view:{xmin:0,xmax:120,ymin:0,ymax:4000}});
   const narrow=recording(h,{view:{xmin:10,xmax:10.8,ymin:0,ymax:4000}});
   const wideStep=h.graphConfig(wide,720).options.scales.x.ticks.stepSize;
   const narrowStep=h.graphConfig(narrow,720).options.scales.x.ticks.stepSize;
-  assert.equal(wideStep,10);
+  assert.equal(wideStep,1);
   assert.equal(narrowStep,.05);
   assert.ok(narrowStep<wideStep);
 });
@@ -457,13 +525,13 @@ test('adaptive tick spacing and sample dots still respond to zoom and width', ()
   const h = load(), t = recording(h, { view: { xmin: 0, xmax: 16, ymin: 0, ymax: 4000 } });
   const config = h.graphConfig(t, 720), radius = config.data.datasets[0].pointRadius;
   assert.equal(config.options.scales.x.ticks.stepSize, 1);
-  assert.equal(h.graphConfig(t, 160).options.scales.x.ticks.stepSize, 5);
+  assert.equal(h.graphConfig(t, 160).options.scales.x.ticks.stepSize, 1);
   assert.equal(radius({ chart: { scales: { x: { min: 0, max: 16 } } } }), 3);
   assert.equal(radius({ chart: { scales: { x: { min: 0, max: 45 } } } }), 1.6);
   assert.equal(radius({ chart: { scales: { x: { min: 0, max: 120 } } } }), 0);
   const chart = { scales: { x: { min: 0, max: 120 } }, options: config.options };
   config.options.onResize(chart, { width: 720 });
-  assert.equal(chart.options.scales.x.ticks.stepSize, 10);
+  assert.equal(chart.options.scales.x.ticks.stepSize, 1);
 });
 
 test('imports preserve duplicate sample times, skip repeated files, and stop at 50', async () => {
